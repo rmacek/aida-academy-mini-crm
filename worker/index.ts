@@ -5,6 +5,11 @@ import handler from "vinext/server/app-router-entry";
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  DOCUMENTS: R2Bucket;
+  AIDA_API_BASE_URL?: string;
+  AIDA_SERVICE_TOKEN?: string;
+  AIDA_MODEL_PROFILE_NAME?: string;
+  ACADEMY_DEMO_MODE?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {

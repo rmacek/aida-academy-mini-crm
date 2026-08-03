@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local development. Never commit real secrets.
+ACADEMY_DEMO_MODE=local
+AIDA_API_BASE_URL=https://2991a6ba.iqxgroup.olares.com
+AIDA_MODEL_PROFILE_NAME=Academy General
+AIDA_SERVICE_TOKEN=replace-with-participant-service-account-token
