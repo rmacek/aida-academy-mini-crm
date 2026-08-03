@@ -135,7 +135,7 @@ function Nav({ active, icon, label, badge, onClick }: { active: boolean; icon: s
 }
 
 function Overview({ opportunity, activities, documents, artifacts, onView, onArtifact }: { opportunity: Opportunity; activities: Activity[]; documents: OpportunityDocument[]; artifacts: Artifact[]; onView: (view: View) => void; onArtifact: (item: Artifact) => void }) {
-  const next = activities.find(item => item.status !== "done");
+  const next = activities.find(item => item.status !== "done" && item.type !== "note");
   return <>
     <div className="page-heading"><div><small>Verkaufschance</small><h1>{opportunity.name}</h1><p>{opportunity.summary}</p></div><button className="primary" onClick={() => onView("copilot")}>✦ Mit AIDA arbeiten</button></div>
     <div className="metric-grid">
@@ -153,7 +153,7 @@ function Overview({ opportunity, activities, documents, artifacts, onView, onArt
 }
 
 function Activities({ items, busy, onToggle, onAdd }: { items: Activity[]; busy: boolean; onToggle: (id: string) => void; onAdd: () => void }) {
-  return <><div className="page-heading"><div><small>Arbeitsorganisation</small><h1>Aktivitäten</h1><p>Termine, Aufgaben und Notizen im Kontext der aktiven Verkaufschance.</p></div><button className="primary" onClick={onAdd}>＋ Notiz erfassen</button></div><section className="panel list-panel">{items.map(item => <div className={`activity-full ${item.status === "done" ? "done" : ""}`} key={item.id}><button disabled={busy || item.type !== "todo"} onClick={() => onToggle(item.id)} aria-label={item.status === "done" ? "Aufgabe wieder öffnen" : "Aufgabe erledigen"}>{item.type === "todo" ? (item.status === "done" ? "✓" : "○") : item.type === "appointment" ? "◷" : "✎"}</button><div><small>{activityType(item.type)} · {dateTime.format(new Date(item.dueAt))}</small><strong>{item.title}</strong><p>{item.body}</p></div><span>{item.status === "done" ? "Erledigt" : item.type === "todo" ? "Offen" : "Erfasst"}</span></div>)}</section></>;
+  return <><div className="page-heading"><div><small>Arbeitsorganisation</small><h1>Aktivitäten</h1><p>Termine, Aufgaben und Notizen im Kontext der aktiven Verkaufschance.</p></div><button className="primary" onClick={onAdd}>＋ Notiz erfassen</button></div><section className="panel list-panel">{items.map(item => <div className={`activity-full ${item.status === "done" ? "done" : ""}`} key={item.id}>{item.type === "todo" ? <button disabled={busy} onClick={() => onToggle(item.id)} aria-label={item.status === "done" ? "Aufgabe wieder öffnen" : "Aufgabe erledigen"}>{item.status === "done" ? "✓" : "○"}</button> : <span className="activity-symbol" aria-hidden="true">{item.type === "appointment" ? "◷" : "✎"}</span>}<div><small>{activityType(item.type)} · {dateTime.format(new Date(item.dueAt))}</small><strong>{item.title}</strong><p>{item.body}</p></div><span>{item.status === "done" ? "Erledigt" : item.type === "todo" ? "Offen" : "Erfasst"}</span></div>)}</section></>;
 }
 
 function Documents({ items, busy, onUpload }: { items: OpportunityDocument[]; busy: boolean; onUpload: () => void }) {

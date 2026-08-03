@@ -10,6 +10,7 @@ export async function currentApiUser() {
       displayName: "Ronald Macek",
       email: "rmacek@example.invalid",
       fullName: "Ronald Macek",
+      mode: "local",
     };
   }
   return null;
