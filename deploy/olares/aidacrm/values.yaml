@@ -1,0 +1,24 @@
+workloads:
+  aidacrm:
+    replicaCount: 1
+
+image:
+  repository: ghcr.io/rmacek/aida-academy-mini-crm
+  pullPolicy: IfNotPresent
+
+olaresEnv:
+  CRM_TENANT_NAME: Mein Unternehmen
+  CRM_BOOTSTRAP_ADMIN_USERNAME: admin
+  # Render-only sentinels are replaced from OlaresManifest envs during installation.
+  CRM_BOOTSTRAP_ADMIN_PASSWORD: AIDA_REQUIRED_FROM_OLARES_ADMIN_PASSWORD_2026!
+  CRM_SEED_SAMPLE_DATA: 'false'
+  AIDA_API_BASE_URL: https://required-from-olares.invalid
+  AIDA_MODEL_PROFILE_NAME: Local Primary - Trainer
+  AIDA_PRODUCT_KNOWLEDGE_BASE_ID: 00000000-0000-4000-8000-000000000000
+  AIDA_SERVICE_TOKEN: AIDA_REQUIRED_FROM_OLARES_SERVICE_TOKEN_2026
+
+database:
+  maximumPoolSize: 5
+
+userspace:
+  appData: /tmp/aidacrm-appdata

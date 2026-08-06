@@ -1,5 +1,11 @@
-# Copy to .dev.vars for local development. Never commit real secrets.
-ACADEMY_DEMO_MODE=local
+# Copy to .env.local for local development. Never commit real secrets.
+DATABASE_URL=postgresql://aida_crm:aida_crm@127.0.0.1:5432/aida_crm
+CRM_TENANT_NAME=Academy - rmacek
+CRM_PUBLIC_ORIGIN=http://127.0.0.1:3000
+CRM_BOOTSTRAP_ADMIN_USERNAME=rmacek
+CRM_BOOTSTRAP_ADMIN_PASSWORD=iqx4academy2026.
+CRM_DOCUMENT_ROOT=./work/documents
 AIDA_API_BASE_URL=https://2991a6ba.iqxgroup.olares.com
-AIDA_MODEL_PROFILE_NAME=Academy General
+AIDA_MODEL_PROFILE_NAME=Local Primary - Trainer
+AIDA_PRODUCT_KNOWLEDGE_BASE_ID=replace-with-aida-product-knowledge-base-uuid
 AIDA_SERVICE_TOKEN=replace-with-participant-service-account-token

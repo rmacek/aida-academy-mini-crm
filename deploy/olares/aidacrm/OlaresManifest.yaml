@@ -1,0 +1,138 @@
+olaresManifest.version: '0.12.0'
+olaresManifest.type: app
+apiVersion: 'v3'
+
+workloadReplicas:
+  aidacrm: 1
+
+metadata:
+  name: aidacrm
+  title: AIDA CRM
+  description: Mehrbenutzerfähiges CRM für Verkaufschancen mit kontextisolierten AIDA-Assistenten.
+  icon: https://raw.githubusercontent.com/rmacek/aida-academy-mini-crm/main/public/market-icon.webp
+  version: '1.0.0'
+  categories:
+    - Productivity_v112
+
+entrances:
+  - name: aidacrm
+    host: aidacrm
+    port: 80
+    title: AIDA CRM
+    icon: https://raw.githubusercontent.com/rmacek/aida-academy-mini-crm/main/public/market-icon.webp
+    authLevel: public
+    openMethod: window
+
+spec:
+  versionName: '1.0.0'
+  fullDescription: |
+    AIDA CRM verwaltet Verkaufschancen, Kunden-UseCases, Termine, Aufgaben,
+    Notizen, Dokumente, Unterhaltungen und KI-Artefakte. Vorkonfigurierte,
+    tenantlokale CRM-Assistenten prüfen Machbarkeit, erstellen E-Mails,
+    Angebote und Umsetzungs-Handouts und spezifizieren belegte AIDA-Lücken.
+    Jede Installation besitzt eine eigene PostgreSQL-Datenbank. Alle
+    berechtigten CRM-Benutzer der Installation arbeiten in demselben
+    Unternehmenskontext; andere Installationen bleiben getrennt.
+  upgradeDescription: |
+    Erstveröffentlichung mit versioniertem PostgreSQL-Schema, Rollen,
+    erzwungenem Passwortwechsel, Auditprotokoll und kontextgebundenem AIDA-Copiloten.
+  developer: Ronald Macek
+  website: https://github.com/rmacek/aida-academy-mini-crm
+  sourceCode: https://github.com/rmacek/aida-academy-mini-crm
+  submitter: Ronald Macek
+  locale:
+    - de-DE
+  supportArch:
+    - amd64
+    - arm64
+  onlyAdmin: true
+  runAsUser: true
+  requiredCpu: 100m
+  limitedCpu: '2'
+  requiredMemory: 256Mi
+  limitedMemory: 1Gi
+  requiredDisk: 100Mi
+  limitedDisk: 10Gi
+
+middleware:
+  postgres:
+    username: aidacrm
+    databases:
+      - name: aidacrm
+        distributed: false
+
+permission:
+  appData: true
+
+envs:
+  - envName: CRM_TENANT_NAME
+    required: true
+    default: Mein Unternehmen
+    editable: true
+    applyOnChange: true
+    type: string
+    regex: '^.{2,120}$'
+    description: Anzeigename der CRM-Installation; keine technische Tenant-ID.
+  - envName: CRM_BOOTSTRAP_ADMIN_USERNAME
+    required: true
+    default: admin
+    editable: true
+    applyOnChange: false
+    type: string
+    regex: '^[a-z][a-z0-9._-]{2,79}$'
+    description: Erster CRM-Administrator. Der Wert wird nur bei leerer Datenbank verwendet.
+  - envName: CRM_BOOTSTRAP_ADMIN_PASSWORD
+    required: true
+    editable: true
+    applyOnChange: false
+    type: password
+    regex: '^.{16,256}$'
+    description: Initialpasswort; die App erzwingt bei der ersten Anmeldung einen Wechsel.
+  - envName: CRM_SEED_SAMPLE_DATA
+    required: true
+    default: 'false'
+    editable: true
+    applyOnChange: false
+    type: string
+    options:
+      - title: Leere produktive Installation
+        value: 'false'
+      - title: Synthetische Workshop-Daten
+        value: 'true'
+  - envName: AIDA_API_BASE_URL
+    required: true
+    editable: true
+    applyOnChange: true
+    type: string
+    regex: '^https://[^?#]+$'
+    description: Öffentliche HTTPS-Adresse der AIDA-Instanz.
+  - envName: AIDA_MODEL_PROFILE_NAME
+    required: true
+    default: Local Primary - Trainer
+    editable: true
+    applyOnChange: true
+    type: string
+    regex: '^.{2,180}$'
+    description: Standard-Modellprofil; ein lokales Profil wird aus Kosten- und Datenschutzgründen empfohlen.
+  - envName: AIDA_PRODUCT_KNOWLEDGE_BASE_ID
+    required: true
+    editable: true
+    applyOnChange: true
+    type: string
+    regex: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
+    description: ID der tenantgebundenen Wissensbasis mit freigegebenem AIDA-Produktwissen.
+  - envName: AIDA_SERVICE_TOKEN
+    required: true
+    editable: true
+    applyOnChange: true
+    type: password
+    regex: '^.{20,4096}$'
+    description: Tenantgebundener AIDA-Service-Account-Token; bleibt ausschließlich serverseitig.
+
+options:
+  dependencies:
+    - name: olares
+      version: '>=1.12.6-0'
+      type: system
+  allowMultipleInstall: true
+  mobileSupported: true

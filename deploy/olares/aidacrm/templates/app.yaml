@@ -1,0 +1,117 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aidacrm.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "aidacrm.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: aidacrm
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aidacrm.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "aidacrm.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.workloads.aidacrm.replicaCount }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aidacrm
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "aidacrm.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: {{ printf "%s-runtime" (include "aidacrm.fullname" .) }}
+          env:
+            - name: CRM_VERSION
+              value: {{ .Chart.AppVersion | quote }}
+            - name: CRM_TENANT_NAME
+              value: {{ .Values.olaresEnv.CRM_TENANT_NAME | quote }}
+            - name: CRM_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ .Values.olaresEnv.CRM_BOOTSTRAP_ADMIN_USERNAME | quote }}
+            - name: CRM_SEED_SAMPLE_DATA
+              value: {{ .Values.olaresEnv.CRM_SEED_SAMPLE_DATA | quote }}
+            - name: CRM_DOCUMENT_ROOT
+              value: /data/documents
+            - name: CRM_POSTGRES_MAX_POOL_SIZE
+              value: {{ .Values.database.maximumPoolSize | quote }}
+            - name: AIDA_API_BASE_URL
+              value: {{ required "AIDA_API_BASE_URL is required" .Values.olaresEnv.AIDA_API_BASE_URL | quote }}
+            - name: AIDA_MODEL_PROFILE_NAME
+              value: {{ .Values.olaresEnv.AIDA_MODEL_PROFILE_NAME | quote }}
+            - name: AIDA_PRODUCT_KNOWLEDGE_BASE_ID
+              value: {{ required "AIDA_PRODUCT_KNOWLEDGE_BASE_ID is required" .Values.olaresEnv.AIDA_PRODUCT_KNOWLEDGE_BASE_ID | quote }}
+          startupProbe:
+            httpGet:
+              path: /api/health/ready
+              port: http
+            failureThreshold: 45
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health/live
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: '2'
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: documents
+              mountPath: /data/documents
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: documents
+          hostPath:
+            path: {{ printf "%s/documents" .Values.userspace.appData | quote }}
+            type: DirectoryOrCreate
+        - name: temporary
+          emptyDir:
+            sizeLimit: 256Mi

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: aidacrm
+description: Tenant-installable multi-user CRM with contextual AIDA assistants
+type: application
+version: 1.0.0
+appVersion: 1.0.0

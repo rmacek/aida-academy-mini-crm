@@ -1,0 +1,13 @@
+.git
+.github
+.next
+.vinext
+.wrangler
+dist
+node_modules
+work
+outputs
+*.log
+.env*
+.dev.vars
+artifacts
