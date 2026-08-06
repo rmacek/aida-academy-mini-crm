@@ -115,11 +115,11 @@ async function seedSampleData(client: PoolClient, adminId: string) {
       (id, code, name, customer, value_eur, stage, probability, close_date, summary,
        use_case, accent, context_marker, owner_user_id, created_by)
      VALUES
-      ($1, 'OPP-2026-014', 'AIDA für den Service Desk', 'Nordstern Maschinenbau GmbH', 148000,
+      ($1, 'OPP-2026-101', 'AIDA für den Service Desk', 'Nordstern Maschinenbau GmbH', 148000,
        'Lösungsdesign', 65, '2026-09-30', 'Ein KI-gestützter Service Desk mit sicherem Produktwissen und klarer Übergabe an Menschen.',
        'Service-Mitarbeiter sollen technische Anfragen mit AIDA beantworten, Antworten auf freigegebenes Produktwissen zurückführen und bei Unsicherheit kontrolliert an Menschen eskalieren.',
-       'violet', 'NORDSTERN-KONTEXT-14', $3, $3),
-      ($2, 'OPP-2026-027', 'AIDA für Angebotswissen', 'Alpenblick Energie AG', 92000,
+       'violet', 'NORDSTERN-KONTEXT-101', $3, $3),
+      ($2, 'OPP-2026-202', 'AIDA für Angebotswissen', 'Alpenblick Energie AG', 92000,
        'Qualifizierung', 35, '2026-10-15', 'Vertriebswissen zentralisieren und Angebotsentwürfe mit nachvollziehbaren Quellen erstellen.',
        'Vertriebsmitarbeiter sollen aus freigegebenen Leistungsbeschreibungen einen kundenbezogenen Angebotsentwurf erzeugen und vor dem Versand einen menschlichen Freigabeschritt durchlaufen.',
        'teal', 'PROJEKT-SONNENWENDE-42', $3, $3)`,

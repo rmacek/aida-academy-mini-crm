@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build
 
 FROM node:24.6.0-alpine3.22 AS runtime
-ARG VERSION=1.0.0
+ARG VERSION=1.0.1
 LABEL org.opencontainers.image.title="AIDA CRM" \
       org.opencontainers.image.description="Tenant-installable multi-user CRM with contextual AIDA assistants" \
       org.opencontainers.image.version="${VERSION}" \
