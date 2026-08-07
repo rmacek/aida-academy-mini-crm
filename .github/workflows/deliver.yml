@@ -48,6 +48,8 @@ jobs:
 
       - name: Validate Olares chart
         run: |
+          repository_name="${GITHUB_REPOSITORY##*/}"
+          image_repository="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${repository_name,,}"
           chart_values=(
             --set-string postgres.host=postgres.review.invalid
             --set-string postgres.port=5432
@@ -58,7 +60,7 @@ jobs:
           helm lint deploy/olares/aidacrm "${chart_values[@]}"
           helm template aidacrm deploy/olares/aidacrm \
             --namespace aidacrm-review \
-            --set-string image.repository=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/aida-academy-mini-crm \
+            --set-string image.repository="$image_repository" \
             "${chart_values[@]}" \
             > /tmp/aidacrm-rendered.yaml
           test -s /tmp/aidacrm-rendered.yaml
@@ -91,7 +93,8 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/aida-academy-mini-crm:$VERSION"
+          repository_name="${GITHUB_REPOSITORY##*/}"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${repository_name,,}:$VERSION"
           if docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
             echo "The immutable image tag already exists: $image" >&2
             exit 1
@@ -101,10 +104,12 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/aida-academy-mini-crm"
+          repository_name="${GITHUB_REPOSITORY##*/}"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${repository_name,,}"
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --build-arg VERSION="$VERSION" \
+            --build-arg SOURCE_URL="https://github.com/$GITHUB_REPOSITORY" \
             --provenance=mode=max \
             --sbom=true \
             --tag "$image:$VERSION" \
@@ -120,6 +125,11 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
+          repository_name="${GITHUB_REPOSITORY##*/}"
+          image_repository="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${repository_name,,}"
+          sed -i "s|^  repository: .*|  repository: $image_repository|" deploy/olares/aidacrm/values.yaml
+          sed -i "s|^  website: .*|  website: https://github.com/$GITHUB_REPOSITORY|" deploy/olares/aidacrm/OlaresManifest.yaml
+          sed -i "s|^  sourceCode: .*|  sourceCode: https://github.com/$GITHUB_REPOSITORY|" deploy/olares/aidacrm/OlaresManifest.yaml
           mkdir -p delivery
           helm package deploy/olares/aidacrm --destination delivery
           test -f "delivery/aidacrm-$VERSION.tgz"

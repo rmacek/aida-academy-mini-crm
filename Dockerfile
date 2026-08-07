@@ -13,10 +13,11 @@ RUN npm run build
 
 FROM node:24.6.0-alpine3.22 AS runtime
 ARG VERSION=1.0.2
+ARG SOURCE_URL=https://github.com/rmacek/aida-academy-mini-crm
 LABEL org.opencontainers.image.title="AIDA CRM" \
       org.opencontainers.image.description="Tenant-installable multi-user CRM with contextual AIDA assistants" \
       org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.source="https://github.com/rmacek/aida-academy-mini-crm"
+      org.opencontainers.image.source="${SOURCE_URL}"
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \

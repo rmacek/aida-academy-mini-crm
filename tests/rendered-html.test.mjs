@@ -56,7 +56,7 @@ test("loads CRM assistants dynamically and keeps the AIDA token server-side", as
 });
 
 test("packages an independently installable PostgreSQL-backed Marketplace app", async () => {
-  const [schema, manifest, deployment, runtimeSecret, values, nextConfig, exampleEnv, apiUser, documents] = await Promise.all([
+  const [schema, manifest, deployment, runtimeSecret, values, nextConfig, exampleEnv, apiUser, documents, workflow, dockerfile] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../deploy/olares/aidacrm/OlaresManifest.yaml", import.meta.url), "utf8"),
     readFile(new URL("../deploy/olares/aidacrm/templates/app.yaml", import.meta.url), "utf8"),
@@ -66,6 +66,8 @@ test("packages an independently installable PostgreSQL-backed Marketplace app", 
     readFile(new URL("../.dev.vars.example", import.meta.url), "utf8"),
     readFile(new URL("../app/api-user.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/documents.ts", import.meta.url), "utf8"),
+    readFile(new URL("../.github/workflows/deliver.yml", import.meta.url), "utf8"),
+    readFile(new URL("../Dockerfile", import.meta.url), "utf8"),
   ]);
   assert.match(manifest, /allowMultipleInstall: true/);
   assert.match(manifest, /middleware:\n  postgres:/);
@@ -82,4 +84,8 @@ test("packages an independently installable PostgreSQL-backed Marketplace app", 
   assert.match(apiUser, /x-forwarded-host/);
   assert.match(documents, /await import\("pdf-parse"\)/);
   assert.doesNotMatch(documents, /^import .* from "pdf-parse"/m);
+  assert.match(workflow, /repository_name="\$\{GITHUB_REPOSITORY##\*\/\}"/);
+  assert.match(workflow, /image_repository="ghcr\.io\/\$\{GITHUB_REPOSITORY_OWNER,,\}\/\$\{repository_name,,\}"/);
+  assert.match(workflow, /--build-arg SOURCE_URL="https:\/\/github\.com\/\$GITHUB_REPOSITORY"/);
+  assert.match(dockerfile, /org\.opencontainers\.image\.source="\$\{SOURCE_URL\}"/);
 });
