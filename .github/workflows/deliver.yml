@@ -104,6 +104,7 @@ jobs:
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/aida-academy-mini-crm"
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
+            --build-arg VERSION="$VERSION" \
             --provenance=mode=max \
             --sbom=true \
             --tag "$image:$VERSION" \
