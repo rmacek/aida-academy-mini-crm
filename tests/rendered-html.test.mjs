@@ -85,6 +85,9 @@ test("packages an independently installable PostgreSQL-backed Marketplace app", 
   assert.match(documents, /await import\("pdf-parse"\)/);
   assert.doesNotMatch(documents, /^import .* from "pdf-parse"/m);
   assert.match(workflow, /repository_name="\$\{GITHUB_REPOSITORY##\*\/\}"/);
+  assert.match(workflow, /branches:\n\s+- 'aida\/release-\*'/);
+  assert.match(workflow, /outputs:\n\s+version: \$\{\{ steps\.version\.outputs\.value \}\}/);
+  assert.match(workflow, /VERSION: \$\{\{ needs\.validate\.outputs\.version \}\}/);
   assert.match(workflow, /image_repository="ghcr\.io\/\$\{GITHUB_REPOSITORY_OWNER,,\}\/\$\{repository_name,,\}"/);
   assert.match(workflow, /--build-arg SOURCE_URL="https:\/\/github\.com\/\$GITHUB_REPOSITORY"/);
   assert.match(dockerfile, /org\.opencontainers\.image\.source="\$\{SOURCE_URL\}"/);

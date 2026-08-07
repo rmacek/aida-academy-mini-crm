@@ -7,6 +7,9 @@ on:
         description: Exact new X.Y.Z application version
         required: true
         type: string
+  push:
+    branches:
+      - 'aida/release-*'
 
 permissions:
   contents: read
@@ -19,6 +22,8 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - name: Check out reviewed branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -30,15 +35,20 @@ jobs:
           cache: npm
 
       - name: Verify immutable version contract
+        id: version
         env:
           EXPECTED_VERSION: ${{ inputs.version }}
         run: |
-          test "$EXPECTED_VERSION" = "$(node -p 'require("./package.json").version')"
-          test "$EXPECTED_VERSION" = "$(sed -n 's/^version: //p' deploy/olares/aidacrm/Chart.yaml)"
-          test "$EXPECTED_VERSION" = "$(sed -n 's/^appVersion: //p' deploy/olares/aidacrm/Chart.yaml)"
-          test "3" = "$(printf '%s' "$EXPECTED_VERSION" | awk -F. '{print NF}')"
-          grep -Fq "version: '$EXPECTED_VERSION'" deploy/olares/aidacrm/OlaresManifest.yaml
-          grep -Fq "versionName: '$EXPECTED_VERSION'" deploy/olares/aidacrm/OlaresManifest.yaml
+          actual_version="$(node -p 'require("./package.json").version')"
+          if [ -n "$EXPECTED_VERSION" ]; then
+            test "$EXPECTED_VERSION" = "$actual_version"
+          fi
+          test "$actual_version" = "$(sed -n 's/^version: //p' deploy/olares/aidacrm/Chart.yaml)"
+          test "$actual_version" = "$(sed -n 's/^appVersion: //p' deploy/olares/aidacrm/Chart.yaml)"
+          test "3" = "$(printf '%s' "$actual_version" | awk -F. '{print NF}')"
+          grep -Fq "version: '$actual_version'" deploy/olares/aidacrm/OlaresManifest.yaml
+          grep -Fq "versionName: '$actual_version'" deploy/olares/aidacrm/OlaresManifest.yaml
+          printf 'value=%s\n' "$actual_version" >> "$GITHUB_OUTPUT"
 
       - name: Install locked dependencies
         run: npm ci
@@ -91,7 +101,7 @@ jobs:
 
       - name: Reject an existing immutable image tag
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           repository_name="${GITHUB_REPOSITORY##*/}"
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${repository_name,,}:$VERSION"
@@ -102,7 +112,7 @@ jobs:
 
       - name: Build and publish the multi-architecture image
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           repository_name="${GITHUB_REPOSITORY##*/}"
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${repository_name,,}"
@@ -123,7 +133,7 @@ jobs:
 
       - name: Package the Olares chart
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           repository_name="${GITHUB_REPOSITORY##*/}"
           image_repository="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${repository_name,,}"
@@ -139,10 +149,10 @@ jobs:
       - name: Upload immutable delivery evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: aidacrm-${{ inputs.version }}-${{ github.sha }}
+          name: aidacrm-${{ needs.validate.outputs.version }}-${{ github.sha }}
           path: |
-            delivery/aidacrm-${{ inputs.version }}.tgz
-            delivery/aidacrm-${{ inputs.version }}.tgz.sha256
+            delivery/aidacrm-${{ needs.validate.outputs.version }}.tgz
+            delivery/aidacrm-${{ needs.validate.outputs.version }}.tgz.sha256
             image-digest.txt
             image-inspect.txt
           if-no-files-found: error
