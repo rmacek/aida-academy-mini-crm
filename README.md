@@ -81,3 +81,16 @@ synthetische Verkaufschancen für den Isolationstest.
 Das Chart liegt unter `deploy/olares/aidacrm`. Es unterstützt mehrere unabhängige
 Installationen, bezieht PostgreSQL über Olares-Middleware und läuft ohne Root,
 Service-Account-Token oder beschreibbares Root-Dateisystem.
+
+## Kontrollierte Veröffentlichung
+
+Der vorhandene Workflow `.github/workflows/deliver.yml` übernimmt nach einem
+freigegebenen Review die reproduzierbare Delivery. Er prüft die Anwendung und
+das Olares-Chart, lehnt bereits vorhandene Image-Tags ab, erzeugt ein
+SBOM-attestiertes Multi-Arch-Image für `linux/amd64` und `linux/arm64` und legt
+Chart, Prüfsumme, Image-Digest und Manifest als GitHub-Actions-Artefakt ab.
+
+Der Workflow wird ausschließlich auf einem persönlichen Workshop-Branch und
+mit einer neuen, in `package.json`, `Chart.yaml` und `OlaresManifest.yaml`
+identischen Version gestartet. Die Marketplace-Installation bleibt eine
+getrennte, ausdrücklich bestätigte Trainerhandlung.
