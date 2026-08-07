@@ -1,0 +1,138 @@
+name: Deliver immutable Olares application
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact new X.Y.Z application version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deliver-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out reviewed branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.9.0
+          cache: npm
+
+      - name: Verify immutable version contract
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
+        run: |
+          test "$EXPECTED_VERSION" = "$(node -p 'require("./package.json").version')"
+          test "$EXPECTED_VERSION" = "$(sed -n 's/^version: //p' deploy/olares/aidacrm/Chart.yaml)"
+          test "$EXPECTED_VERSION" = "$(sed -n 's/^appVersion: //p' deploy/olares/aidacrm/Chart.yaml)"
+          test "3" = "$(printf '%s' "$EXPECTED_VERSION" | awk -F. '{print NF}')"
+          grep -Fq "version: '$EXPECTED_VERSION'" deploy/olares/aidacrm/OlaresManifest.yaml
+          grep -Fq "versionName: '$EXPECTED_VERSION'" deploy/olares/aidacrm/OlaresManifest.yaml
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run application quality gates
+        run: npm run test:all
+
+      - name: Validate Olares chart
+        run: |
+          chart_values=(
+            --set-string postgres.host=postgres.review.invalid
+            --set-string postgres.port=5432
+            --set-string postgres.databases.aidacrm=aidacrm
+            --set-string postgres.username=aidacrm
+            --set-string postgres.password=render-only-password
+          )
+          helm lint deploy/olares/aidacrm "${chart_values[@]}"
+          helm template aidacrm deploy/olares/aidacrm \
+            --namespace aidacrm-review \
+            --set-string image.repository=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/aida-academy-mini-crm \
+            "${chart_values[@]}" \
+            > /tmp/aidacrm-rendered.yaml
+          test -s /tmp/aidacrm-rendered.yaml
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out reviewed branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Enable cross-platform execution
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Configure Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reject an existing immutable image tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/aida-academy-mini-crm:$VERSION"
+          if docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
+            echo "The immutable image tag already exists: $image" >&2
+            exit 1
+          fi
+
+      - name: Build and publish the multi-architecture image
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/aida-academy-mini-crm"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=mode=max \
+            --sbom=true \
+            --tag "$image:$VERSION" \
+            --tag "$image:${GITHUB_SHA}" \
+            --push .
+          docker buildx imagetools inspect "$image:$VERSION" > image-inspect.txt
+          grep -Eq 'Platform:[[:space:]]+linux/amd64' image-inspect.txt
+          grep -Eq 'Platform:[[:space:]]+linux/arm64' image-inspect.txt
+          awk '/^Digest:/ { print $2; exit }' image-inspect.txt > image-digest.txt
+          grep -Eq '^sha256:[0-9a-f]{64}$' image-digest.txt
+
+      - name: Package the Olares chart
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p delivery
+          helm package deploy/olares/aidacrm --destination delivery
+          test -f "delivery/aidacrm-$VERSION.tgz"
+          cd delivery
+          sha256sum "aidacrm-$VERSION.tgz" > "aidacrm-$VERSION.tgz.sha256"
+
+      - name: Upload immutable delivery evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aidacrm-${{ inputs.version }}-${{ github.sha }}
+          path: |
+            delivery/aidacrm-${{ inputs.version }}.tgz
+            delivery/aidacrm-${{ inputs.version }}.tgz.sha256
+            image-digest.txt
+            image-inspect.txt
+          if-no-files-found: error
+          retention-days: 30
