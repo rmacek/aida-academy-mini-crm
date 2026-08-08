@@ -27,6 +27,8 @@ spec:
           port: 53
     - ports:
         - protocol: TCP
+          port: 80
+        - protocol: TCP
           port: 443
         - protocol: TCP
           port: 5432

@@ -283,7 +283,23 @@ function Copilot({ opportunity, assistants, conversations, conversation, message
   const defaultAssistant = assistants.find(item => item.key === "sales-copilot") ?? assistants[0];
   const [prompt, setPrompt] = useState(""); const [assistantKey, setAssistantKey] = useState(defaultAssistant?.key ?? "");
   const selectedAssistant = assistants.find(item => item.key === assistantKey) ?? defaultAssistant;
-  async function send(event: FormEvent) { event.preventDefault(); if (!conversation || !prompt.trim() || !selectedAssistant) return; onBusy(true); onError(""); try { const response = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ opportunityId: opportunity.id, conversationId: conversation.id, prompt, assistantKey: selectedAssistant.key }) }); const body = await response.json() as { message?: string }; if (!response.ok) throw new Error(body.message ?? "AIDA konnte die Aufgabe nicht ausführen."); setPrompt(""); await onRefresh(); } catch (caught) { onError(messageOf(caught)); } finally { onBusy(false); } }
+  async function send(event: FormEvent) {
+    event.preventDefault();
+    if (!conversation || !prompt.trim() || !selectedAssistant) return;
+    onBusy(true); onError("");
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ opportunityId: opportunity.id, conversationId: conversation.id,
+          prompt, assistantKey: selectedAssistant.key }),
+      });
+      await readChatResponse(response);
+      setPrompt("");
+      await onRefresh();
+    } catch (caught) { onError(messageOf(caught)); }
+    finally { onBusy(false); }
+  }
   return <><div className="page-heading compact"><div><small>Isolierter KI-Arbeitsbereich</small><h1>Copilot für {opportunity.code}</h1><p>Die Assistenten sind in dieser CRM-Installation vorkonfiguriert; AIDA erhält ausschließlich den Kontext von {opportunity.customer}.</p></div>{canWrite && <button className="secondary" disabled={busy} onClick={onNew}>＋ Neue Unterhaltung</button>}</div><div className="assistant-cards">{assistants.map(item => <button className={selectedAssistant?.key === item.key ? "selected" : ""} disabled={!canWrite} key={item.key} onClick={() => { setAssistantKey(item.key); setPrompt(item.starterPrompt); }}><strong>{item.displayName}</strong><span>{item.description}</span></button>)}</div><div className="copilot-layout"><aside className="chat-list"><strong>Unterhaltungen</strong>{conversations.map(item => <button className={conversation?.id === item.id ? "active" : ""} key={item.id} onClick={() => onSelect(item.id)}><span>◌</span><div><strong>{item.title}</strong><small>{dateTime.format(new Date(item.updatedAt))}</small></div></button>)}</aside><section className="chat-panel"><div className="chat-header"><span className={`accent ${opportunity.accent}`} /><div><strong>{selectedAssistant?.displayName ?? "CRM-Assistent"}</strong><small>Kontextgrenze: {opportunity.code} · {opportunity.marker}</small></div><span className="protected">◈ geschützt</span></div><div className="messages" aria-live="polite">{messages.length ? messages.map(item => <article className={item.role} key={item.id}><span>{item.role === "assistant" ? "A" : "Sie"}</span><div><small>{item.role === "assistant" ? "AIDA" : "Ihre Aufgabe"}</small><p>{item.content}</p></div></article>) : <Empty text="Wählen Sie einen vorkonfigurierten Assistenten oder stellen Sie eine freie Frage." />}</div><form className="composer" onSubmit={send}><textarea disabled={!canWrite} value={prompt} onChange={event => setPrompt(event.target.value)} maxLength={4000} placeholder={canWrite ? "Was soll der gewählte Assistent für diese Verkaufschance erledigen?" : "Ihre Rolle hat Lesezugriff."} aria-label="Aufgabe an AIDA" /><div><small>{selectedAssistant?.outputLabel ?? "Freie Antwort"} · lokales Modellprofil bevorzugt</small><button className="primary" disabled={busy || !prompt.trim() || !canWrite || !selectedAssistant}>{busy ? "AIDA arbeitet …" : "Senden →"}</button></div></form></section><aside className="artifact-list"><strong>Artefakte</strong><small>Nur {opportunity.code}</small>{artifacts.length ? artifacts.map(item => <button key={item.id} onClick={() => onArtifact(item)}><span>{artifactIcon(item.kind)}</span><div><strong>{item.title}</strong><small>{dateTime.format(new Date(item.createdAt))}</small></div></button>) : <Empty text="Noch keine Ergebnisse gespeichert." />}</aside></div></>;
 }
 
@@ -325,3 +341,38 @@ function formatBytes(value: number) { return value < 1024 ? `${value} B` : `${Ma
 function localDateTime(value: string) { const dateValue = new Date(value); const offset = dateValue.getTimezoneOffset() * 60_000; return new Date(dateValue.getTime() - offset).toISOString().slice(0, 16); }
 function initials(value: string) { return value.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "A"; }
 function messageOf(value: unknown) { return value instanceof Error ? value.message : "Ein unerwarteter Fehler ist aufgetreten."; }
+
+async function readChatResponse(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/x-ndjson") || !response.body) {
+    const text = await response.text();
+    const body = parseJsonRecord(text);
+    if (!response.ok) throw new Error(typeof body?.message === "string"
+      ? body.message : "AIDA konnte die Aufgabe nicht ausführen.");
+    return;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    pending += decoder.decode(value, { stream: !done });
+    const lines = pending.split("\n");
+    pending = lines.pop() ?? "";
+    for (const line of lines) {
+      const event = parseJsonRecord(line);
+      if (event?.type === "error") {
+        throw new Error(typeof event.message === "string"
+          ? event.message : "AIDA konnte die Aufgabe nicht ausführen.");
+      }
+    }
+    if (done) break;
+  }
+}
+
+function parseJsonRecord(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch { return null; }
+}

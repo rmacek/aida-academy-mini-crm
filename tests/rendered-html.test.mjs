@@ -50,6 +50,10 @@ test("loads CRM assistants dynamically and keeps the AIDA token server-side", as
   assert.match(schema, /ELSE false/);
   assert.match(chat, /function aidaErrorMessage/);
   assert.match(chat, /Object\.values\(candidate\.errors\)/);
+  assert.match(chat, /application\/x-ndjson/);
+  assert.match(chat, /type: "progress"/);
+  assert.match(chat, /\.svc\\\.cluster\\\.local/);
+  assert.match(workspace, /response\.body\.getReader\(\)/);
   assert.match(database, /return `ACTION\n/);
   for (const heading of ["Act", "Context", "Task", "Instructions", "Output", "Narrowing"]) {
     assert.match(database, new RegExp(`\\n${heading}\\n`));

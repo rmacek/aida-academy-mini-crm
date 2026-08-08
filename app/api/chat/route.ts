@@ -29,6 +29,8 @@ type AidaResponse = {
   usedFallback: boolean;
 };
 
+class ChatExecutionError extends Error {}
+
 export async function POST(request: Request) {
   if (!(await requireSameOrigin(request))) return Response.json({ error: "invalid_origin" }, { status: 403 });
   const user = await currentApiUser();
@@ -97,75 +99,114 @@ export async function POST(request: Request) {
   }
   let baseUrl: URL;
   try { baseUrl = new URL(runtime.AIDA_API_BASE_URL); } catch { return Response.json({ error: "aida_configuration_invalid" }, { status: 503 }); }
-  if (baseUrl.protocol !== "https:") return Response.json({ error: "aida_configuration_invalid" }, { status: 503 });
+  if (!validAidaBaseUrl(baseUrl)) return Response.json({ error: "aida_configuration_invalid" }, { status: 503 });
 
   const submittedAt = new Date();
   const requestedConversationId = conversation.aidaConversationId ? null : crypto.randomUUID();
-  const response = await fetch(new URL("/api/v1/chat/messages", baseUrl), {
-    method: "POST",
-    redirect: "error",
-    signal: AbortSignal.timeout(90_000),
-    headers: {
-      authorization: `Bearer ${runtime.AIDA_SERVICE_TOKEN}`,
-      "content-type": "application/json",
-      accept: "application/json",
-    },
-    body: JSON.stringify({
-      modelProfileName: assistant.modelProfileName || runtime.AIDA_MODEL_PROFILE_NAME,
-      prompt: buildActionPrompt(opportunityContext, activities, documents, assistant.instructions, prompt),
-      dataClassification: "Internal",
-      contextMode: "Extended",
-      assistantKey: assistant.usesProductKnowledge ? "knowledge" : "general",
-      knowledgeBaseId: assistant.usesProductKnowledge ? runtime.AIDA_PRODUCT_KNOWLEDGE_BASE_ID : null,
-      conversationId: conversation.aidaConversationId,
-      requestedConversationId,
-      runContextMode: null,
-      cloudProcessingConfirmed: false,
-    }),
-  }).catch(() => null);
-  if (!response) {
-    return Response.json({ error: "aida_unavailable", message: "AIDA ist derzeit nicht erreichbar." }, { status: 503 });
-  }
-  if (!response.ok) {
-    const detail = await response.json().catch(() => null) as unknown;
-    return Response.json(
-      { error: "aida_request_failed", message: aidaErrorMessage(detail, response.status) },
-      { status: response.status >= 500 ? 503 : 422 },
-    );
-  }
-  const aida = await response.json() as AidaResponse;
-  if (!aida.answer || aida.answer.length > 100_000 || !validUuid(aida.conversationId)) {
-    return Response.json({ error: "aida_response_invalid" }, { status: 502 });
-  }
-  const completedAt = new Date();
-  await transaction(async client => {
-    await client.query(
-      `INSERT INTO messages(id,conversation_id,role,content,kind,created_by,created_at)
-       VALUES ($1,$2,'user',$3,$4,$5,$6),($7,$2,'assistant',$8,$4,$5,$9)`,
-      [crypto.randomUUID(), conversation.id, prompt, assistant.key, user.userId, submittedAt,
-        crypto.randomUUID(), aida.answer, completedAt],
-    );
-    await client.query(
-      `UPDATE conversations SET aida_conversation_id=$1,updated_at=now()
-       WHERE id=$2 AND opportunity_id=$3`, [aida.conversationId, conversation.id, opportunity.id]);
-    if (assistant.createsArtifact && assistant.outputLabel) {
-      await client.query(
-        `INSERT INTO artifacts(id,opportunity_id,conversation_id,kind,title,content,created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [crypto.randomUUID(), opportunity.id, conversation.id, assistant.key, assistant.outputLabel, aida.answer, user.userId]);
+  return streamedChat(async () => {
+    const response = await fetch(new URL("/api/v1/chat/messages", baseUrl), {
+      method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(180_000),
+      headers: {
+        authorization: `Bearer ${runtime.AIDA_SERVICE_TOKEN}`,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        modelProfileName: assistant.modelProfileName || runtime.AIDA_MODEL_PROFILE_NAME,
+        prompt: buildActionPrompt(opportunityContext, activities, documents, assistant.instructions, prompt),
+        dataClassification: "Internal",
+        contextMode: "Extended",
+        assistantKey: assistant.usesProductKnowledge ? "knowledge" : "general",
+        knowledgeBaseId: assistant.usesProductKnowledge ? runtime.AIDA_PRODUCT_KNOWLEDGE_BASE_ID : null,
+        conversationId: conversation.aidaConversationId,
+        requestedConversationId,
+        runContextMode: null,
+        cloudProcessingConfirmed: false,
+      }),
+    }).catch(() => null);
+    if (!response) throw new ChatExecutionError("AIDA ist derzeit nicht erreichbar.");
+    const responseText = await response.text();
+    const detail = parseJson(responseText);
+    if (!response.ok) throw new ChatExecutionError(aidaErrorMessage(detail, response.status));
+    const aida = detail as AidaResponse | null;
+    if (!aida?.answer || aida.answer.length > 100_000 || !validUuid(aida.conversationId)) {
+      throw new ChatExecutionError("AIDA hat keine verwertbare Antwort geliefert.");
     }
-    await client.query(`INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,outcome,details)
-      VALUES ($1,'copilot.execute','conversation',$2,'succeeded',$3::jsonb)`,
-      [user.userId, conversation.id, JSON.stringify({ assistantKey: assistant.key, profileName: aida.profileName, modelName: aida.modelName, usedFallback: aida.usedFallback })]);
+    const completedAt = new Date();
+    await transaction(async client => {
+      await client.query(
+        `INSERT INTO messages(id,conversation_id,role,content,kind,created_by,created_at)
+         VALUES ($1,$2,'user',$3,$4,$5,$6),($7,$2,'assistant',$8,$4,$5,$9)`,
+        [crypto.randomUUID(), conversation.id, prompt, assistant.key, user.userId, submittedAt,
+          crypto.randomUUID(), aida.answer, completedAt],
+      );
+      await client.query(
+        `UPDATE conversations SET aida_conversation_id=$1,updated_at=now()
+         WHERE id=$2 AND opportunity_id=$3`, [aida.conversationId, conversation.id, opportunity.id]);
+      if (assistant.createsArtifact && assistant.outputLabel) {
+        await client.query(
+          `INSERT INTO artifacts(id,opportunity_id,conversation_id,kind,title,content,created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [crypto.randomUUID(), opportunity.id, conversation.id, assistant.key,
+            assistant.outputLabel, aida.answer, user.userId]);
+      }
+      await client.query(`INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,outcome,details)
+        VALUES ($1,'copilot.execute','conversation',$2,'succeeded',$3::jsonb)`,
+        [user.userId, conversation.id, JSON.stringify({ assistantKey: assistant.key,
+          profileName: aida.profileName, modelName: aida.modelName, usedFallback: aida.usedFallback })]);
+    });
+    return { conversationId: conversation.id, aidaConversationId: aida.conversationId,
+      usedFallback: aida.usedFallback, profileName: aida.profileName, modelName: aida.modelName };
   });
-  return Response.json({
-    answer: aida.answer,
-    conversationId: conversation.id,
-    aidaConversationId: aida.conversationId,
-    usedFallback: aida.usedFallback,
-    profileName: aida.profileName,
-    modelName: aida.modelName,
+}
+
+function streamedChat(operation: () => Promise<Record<string, unknown>>) {
+  const encoder = new TextEncoder();
+  let closed = false;
+  let heartbeat: ReturnType<typeof setInterval> | null = null;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (event: Record<string, unknown>) => {
+        if (!closed) controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      };
+      send({ type: "started" });
+      heartbeat = setInterval(() => send({ type: "progress" }), 5_000);
+      void operation()
+        .then(result => send({ type: "complete", ...result }))
+        .catch(error => send({ type: "error", message: error instanceof ChatExecutionError
+          ? error.message : "AIDA konnte die Aufgabe nicht ausführen." }))
+        .finally(() => {
+          if (heartbeat) clearInterval(heartbeat);
+          heartbeat = null;
+          if (!closed) { closed = true; controller.close(); }
+        });
+    },
+    cancel() {
+      closed = true;
+      if (heartbeat) clearInterval(heartbeat);
+      heartbeat = null;
+    },
   });
+  return new Response(stream, {
+    headers: {
+      "content-type": "application/x-ndjson; charset=utf-8",
+      "cache-control": "no-store, no-transform",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+function parseJson(value: string): unknown {
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+function validAidaBaseUrl(url: URL) {
+  if (url.username || url.password || url.search || url.hash) return false;
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && !url.port
+    && /^aida\.aida-[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.svc\.cluster\.local$/i.test(url.hostname);
 }
 
 function aidaErrorMessage(payload: unknown, status: number) {
