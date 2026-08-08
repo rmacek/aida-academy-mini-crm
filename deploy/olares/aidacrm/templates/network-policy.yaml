@@ -28,6 +28,12 @@ spec:
     - ports:
         - protocol: TCP
           port: 80
+        # Kubernetes applies service translation before some NetworkPolicy
+        # implementations evaluate the destination port. AIDA's service maps
+        # port 80 to the web container's port 8080, so both ports are required
+        # for reliable app-to-app calls on Olares.
+        - protocol: TCP
+          port: 8080
         - protocol: TCP
           port: 443
         - protocol: TCP
