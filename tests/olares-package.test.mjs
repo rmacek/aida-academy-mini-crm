@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const version = "1.0.10";
+const version = "1.0.11";
 const chartRoot = new URL("../deploy/olares/aidacrm/", import.meta.url);
 
 test("all app and Olares package version surfaces are aligned", async () => {
@@ -35,13 +35,14 @@ test("Marketplace scanners can resolve the immutable runtime image", async () =>
   );
 });
 
-test("allows only the HTTPS AIDA API and database egress ports", async () => {
+test("allows HTTPS, restricted in-cluster AIDA, and database egress ports", async () => {
   const networkPolicy = await readFile(
     new URL("templates/network-policy.yaml", chartRoot),
     "utf8",
   );
 
   assert.match(networkPolicy, /port: 443\n/);
+  assert.match(networkPolicy, /port: 80\n/);
+  assert.match(networkPolicy, /port: 8080\n/);
   assert.match(networkPolicy, /port: 5432\n/);
-  assert.doesNotMatch(networkPolicy, /port: 8080\n/);
 });

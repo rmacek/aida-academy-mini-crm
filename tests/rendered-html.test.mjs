@@ -55,7 +55,8 @@ test("loads CRM assistants dynamically and keeps the AIDA token server-side", as
   assert.match(chat, /\/api\/v1\/chat\/messages\/stream/);
   assert.match(chat, /application\/x-ndjson/);
   assert.match(chat, /function readAidaStream/);
-  assert.doesNotMatch(chat, /svc\\\.cluster\\\.local/);
+  assert.match(chat, /endsWith\("\.svc\.cluster\.local"\)/);
+  assert.match(chat, /url\.port === "80"/);
   assert.match(workspace, /response\.body\.getReader\(\)/);
   assert.match(database, /return `ACTION\n/);
   for (const heading of ["Act", "Context", "Task", "Instructions", "Output", "Narrowing"]) {

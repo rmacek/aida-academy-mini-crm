@@ -241,7 +241,10 @@ async function readAidaStream(response: Response): Promise<AidaResponse> {
 
 function validAidaBaseUrl(url: URL) {
   if (url.username || url.password || url.search || url.hash) return false;
-  return url.protocol === "https:";
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:"
+    && url.hostname.endsWith(".svc.cluster.local")
+    && (!url.port || url.port === "80");
 }
 
 function aidaErrorMessage(payload: unknown, status: number) {
