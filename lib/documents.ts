@@ -7,17 +7,17 @@ export async function saveDocument(file: File) {
   if (file.size < 1 || file.size > 5 * 1024 * 1024 || file.name.length > 180) {
     throw new DocumentValidationError("file_not_allowed");
   }
-  const allowed = new Set(["text/plain", "text/markdown", "application/pdf"]);
-  if (!allowed.has(file.type)) throw new DocumentValidationError("file_type_not_allowed");
+  const mediaType = allowedMediaType(file);
+  if (!mediaType) throw new DocumentValidationError("file_type_not_allowed");
   const bytes = Buffer.from(await file.arrayBuffer());
-  if (file.type === "application/pdf" && !bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+  if (mediaType === "application/pdf" && !bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
     throw new DocumentValidationError("file_signature_invalid");
   }
-  if (file.type !== "application/pdf" && bytes.includes(0)) {
+  if (mediaType !== "application/pdf" && bytes.includes(0)) {
     throw new DocumentValidationError("text_file_invalid");
   }
   const id = crypto.randomUUID();
-  const extension = file.type === "application/pdf" ? ".pdf" : file.type === "text/markdown" ? ".md" : ".txt";
+  const extension = mediaType === "application/pdf" ? ".pdf" : mediaType === "text/markdown" ? ".md" : ".txt";
   const storageKey = `${id}${extension}`;
   const destination = containedDocumentPath(storageKey);
   await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
@@ -25,11 +25,25 @@ export async function saveDocument(file: File) {
   return {
     id,
     name: safeFileName(file.name),
-    mediaType: file.type,
+    mediaType,
     size: bytes.length,
     storageKey,
     checksum: createHash("sha256").update(bytes).digest("hex"),
   };
+}
+
+function allowedMediaType(file: File) {
+  const extension = path.extname(file.name).toLowerCase();
+  const byExtension: Record<string, string> = {
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".pdf": "application/pdf",
+  };
+  const inferred = byExtension[extension];
+  if (!inferred) return null;
+  const declared = file.type.trim().toLowerCase();
+  if (!declared || declared === "application/octet-stream") return inferred;
+  return declared === inferred ? inferred : null;
 }
 
 export async function readDocument(storageKey: string) {

@@ -93,6 +93,8 @@ test("packages an independently installable PostgreSQL-backed Marketplace app", 
   assert.match(apiUser, /CRM_PUBLIC_ORIGIN/);
   assert.match(apiUser, /x-forwarded-host/);
   assert.match(documents, /await import\("pdf-parse"\)/);
+  assert.match(documents, /declared === "application\/octet-stream"/);
+  assert.match(documents, /return declared === inferred \? inferred : null/);
   assert.doesNotMatch(documents, /^import .* from "pdf-parse"/m);
   assert.match(workflow, /repository_name="\$\{GITHUB_REPOSITORY##\*\/\}"/);
   assert.match(workflow, /branches:\n\s+- 'aida\/release-\*'/);
