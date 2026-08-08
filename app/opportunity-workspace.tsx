@@ -2,8 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type {
-  Activity, Artifact, AssistantDefinition, Conversation, CrmRole, CrmUser, Message, Opportunity,
-  OpportunityDocument, UserSummary,
+  Activity, Artifact, AssistantDefinition, ChatDispatch, Conversation, CrmRole, CrmUser, Message,
+  Opportunity, OpportunityDocument, UserSummary,
 } from "../db/repository";
 
 type Workspace = {
@@ -16,6 +16,7 @@ type Workspace = {
   conversations: Conversation[];
   messages: Message[];
   artifacts: Artifact[];
+  chatDispatches: ChatDispatch[];
   users: UserSummary[];
   assistants: AssistantDefinition[];
   assistantDefinitions: AssistantDefinition[];
@@ -178,7 +179,7 @@ export function OpportunityWorkspace() {
         {view === "documents" && <Documents items={documents} busy={busy} canWrite={data.permissions.canWrite}
           onUpload={() => fileRef.current?.click()} onDelete={deleteDocument} />}
         {view === "copilot" && <Copilot opportunity={opportunity} assistants={data.assistants} conversations={conversations} conversation={conversation} messages={messages}
-          artifacts={artifacts} busy={busy} canWrite={data.permissions.canWrite} onSelect={setConversationId}
+          artifacts={artifacts} jobs={data.chatDispatches.filter(item => item.opportunityId === opportunity.id)} busy={busy} canWrite={data.permissions.canWrite} onSelect={setConversationId}
           onNew={() => opportunityAction({ action: "new-chat", title: `Neue Unterhaltung ${conversations.length + 1}` })}
           onRefresh={load} onBusy={setBusy} onError={setError} onArtifact={setArtifact} />}
         {view === "assistants" && data.permissions.canManageAssistants && <AssistantAdministration items={data.assistantDefinitions} onEdit={setAssistantEditor} />}
@@ -279,31 +280,70 @@ function Activities({ items, busy, canWrite, onToggle, onDelete, onAdd, onEdit }
 
 function Documents({ items, busy, canWrite, onUpload, onDelete }: { items: OpportunityDocument[]; busy: boolean; canWrite: boolean; onUpload: () => void; onDelete: (id: string) => Promise<void> }) { return <><div className="page-heading"><div><small>Wissensgrundlage</small><h1>Dokumente</h1><p>Nur Dateien dieser Verkaufschance werden dem Copilot als Kontext angeboten.</p></div>{canWrite && <button className="primary" disabled={busy} onClick={onUpload}>⇧ Dokument hochladen</button>}</div><div className="upload-hint">TXT, Markdown oder PDF · maximal 5 MB · vor dem Upload auf Freigabe und sensible Daten prüfen</div><section className="document-grid">{items.length ? items.map(item => <div className="document-card-wrap" key={item.id}><a className="document-card" href={`/api/documents/${item.id}`}><span>{item.mediaType === "application/pdf" ? "PDF" : "TXT"}</span><div><strong>{item.name}</strong><small>{formatBytes(item.size)} · {date.format(new Date(item.createdAt))}</small></div><i>↓</i></a>{canWrite && <button className="icon-button document-delete" disabled={busy} onClick={() => { if (confirm(`„${item.name}“ dauerhaft löschen?`)) void onDelete(item.id); }} aria-label={`Dokument ${item.name} löschen`}>×</button>}</div>) : <Empty text="Noch keine Dokumente hochgeladen." />}</section></>; }
 
-function Copilot({ opportunity, assistants, conversations, conversation, messages, artifacts, busy, canWrite, onSelect, onNew, onRefresh, onBusy, onError, onArtifact }: { opportunity: Opportunity; assistants: AssistantDefinition[]; conversations: Conversation[]; conversation: Conversation | null; messages: Message[]; artifacts: Artifact[]; busy: boolean; canWrite: boolean; onSelect: (id: string) => void; onNew: () => void; onRefresh: () => Promise<void>; onBusy: (value: boolean) => void; onError: (value: string) => void; onArtifact: (item: Artifact) => void }) {
+function Copilot({ opportunity, assistants, conversations, conversation, messages, artifacts, jobs, busy, canWrite, onSelect, onNew, onRefresh, onBusy, onError, onArtifact }: { opportunity: Opportunity; assistants: AssistantDefinition[]; conversations: Conversation[]; conversation: Conversation | null; messages: Message[]; artifacts: Artifact[]; jobs: ChatDispatch[]; busy: boolean; canWrite: boolean; onSelect: (id: string) => void; onNew: () => void; onRefresh: () => Promise<void>; onBusy: (value: boolean) => void; onError: (value: string) => void; onArtifact: (item: Artifact) => void }) {
   const defaultAssistant = assistants.find(item => item.key === "sales-copilot") ?? assistants[0];
   const [prompt, setPrompt] = useState(""); const [assistantKey, setAssistantKey] = useState(defaultAssistant?.key ?? "");
   const selectedAssistant = assistants.find(item => item.key === assistantKey) ?? defaultAssistant;
+  const activeJob = jobs.find(item => item.conversationId === conversation?.id);
+  const activeJobId = activeJob?.id ?? "";
+  useEffect(() => {
+    if (!activeJobId) return;
+    let cancelled = false;
+    async function poll() {
+      for (let attempt = 0; attempt < 300 && !cancelled; attempt++) {
+        try {
+          const response = await fetch("/api/chat", {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ jobId: activeJobId }),
+          });
+          const result = await response.json().catch(() => ({})) as {
+            status?: string;
+            message?: string;
+          };
+          if (result.status === "Succeeded") {
+            await onRefresh();
+            return;
+          }
+          if (result.status === "Failed") {
+            onError(result.message || "AIDA konnte die Aufgabe nicht ausführen.");
+            await onRefresh();
+            return;
+          }
+        } catch {
+          // A transient status failure does not cancel the durable AIDA job.
+        }
+        await new Promise(resolve => setTimeout(resolve, 2_000));
+      }
+      if (!cancelled) {
+        onError("Der AIDA-Auftrag läuft weiter. Öffnen Sie den KI-Arbeitsbereich später erneut.");
+      }
+    }
+    void poll();
+    return () => { cancelled = true; };
+  }, [activeJobId, onError, onRefresh]);
+
   async function send(event: FormEvent) {
     event.preventDefault();
-    if (!conversation || !prompt.trim() || !selectedAssistant) return;
+    if (!conversation || !prompt.trim() || !selectedAssistant || activeJob) return;
     onBusy(true); onError("");
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-envoy-upstream-rq-timeout-ms": "180000",
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ opportunityId: opportunity.id, conversationId: conversation.id,
           prompt, assistantKey: selectedAssistant.key }),
       });
-      await readChatResponse(response);
+      const result = await response.json().catch(() => ({})) as { message?: string };
+      if (!response.ok) {
+        throw new Error(result.message || "AIDA konnte die Aufgabe nicht annehmen.");
+      }
       setPrompt("");
       await onRefresh();
     } catch (caught) { onError(messageOf(caught)); }
     finally { onBusy(false); }
   }
-  return <><div className="page-heading compact"><div><small>Isolierter KI-Arbeitsbereich</small><h1>Copilot für {opportunity.code}</h1><p>Die Assistenten sind in dieser CRM-Installation vorkonfiguriert; AIDA erhält ausschließlich den Kontext von {opportunity.customer}.</p></div>{canWrite && <button className="secondary" disabled={busy} onClick={onNew}>＋ Neue Unterhaltung</button>}</div><div className="assistant-cards">{assistants.map(item => <button className={selectedAssistant?.key === item.key ? "selected" : ""} disabled={!canWrite} key={item.key} onClick={() => { setAssistantKey(item.key); setPrompt(item.starterPrompt); }}><strong>{item.displayName}</strong><span>{item.description}</span></button>)}</div><div className="copilot-layout"><aside className="chat-list"><strong>Unterhaltungen</strong>{conversations.map(item => <button className={conversation?.id === item.id ? "active" : ""} key={item.id} onClick={() => onSelect(item.id)}><span>◌</span><div><strong>{item.title}</strong><small>{dateTime.format(new Date(item.updatedAt))}</small></div></button>)}</aside><section className="chat-panel"><div className="chat-header"><span className={`accent ${opportunity.accent}`} /><div><strong>{selectedAssistant?.displayName ?? "CRM-Assistent"}</strong><small>Kontextgrenze: {opportunity.code} · {opportunity.marker}</small></div><span className="protected">◈ geschützt</span></div><div className="messages" aria-live="polite">{messages.length ? messages.map(item => <article className={item.role} key={item.id}><span>{item.role === "assistant" ? "A" : "Sie"}</span><div><small>{item.role === "assistant" ? "AIDA" : "Ihre Aufgabe"}</small><p>{item.content}</p></div></article>) : <Empty text="Wählen Sie einen vorkonfigurierten Assistenten oder stellen Sie eine freie Frage." />}</div><form className="composer" onSubmit={send}><textarea disabled={!canWrite} value={prompt} onChange={event => setPrompt(event.target.value)} maxLength={4000} placeholder={canWrite ? "Was soll der gewählte Assistent für diese Verkaufschance erledigen?" : "Ihre Rolle hat Lesezugriff."} aria-label="Aufgabe an AIDA" /><div><small>{selectedAssistant?.outputLabel ?? "Freie Antwort"} · lokales Modellprofil bevorzugt</small><button className="primary" disabled={busy || !prompt.trim() || !canWrite || !selectedAssistant}>{busy ? "AIDA arbeitet …" : "Senden →"}</button></div></form></section><aside className="artifact-list"><strong>Artefakte</strong><small>Nur {opportunity.code}</small>{artifacts.length ? artifacts.map(item => <button key={item.id} onClick={() => onArtifact(item)}><span>{artifactIcon(item.kind)}</span><div><strong>{item.title}</strong><small>{dateTime.format(new Date(item.createdAt))}</small></div></button>) : <Empty text="Noch keine Ergebnisse gespeichert." />}</aside></div></>;
+  return <><div className="page-heading compact"><div><small>Isolierter KI-Arbeitsbereich</small><h1>Copilot für {opportunity.code}</h1><p>Die Assistenten sind in dieser CRM-Installation vorkonfiguriert; AIDA erhält ausschließlich den Kontext von {opportunity.customer}.</p></div>{canWrite && <button className="secondary" disabled={busy} onClick={onNew}>＋ Neue Unterhaltung</button>}</div><div className="assistant-cards">{assistants.map(item => <button className={selectedAssistant?.key === item.key ? "selected" : ""} disabled={!canWrite || Boolean(activeJob)} key={item.key} onClick={() => { setAssistantKey(item.key); setPrompt(item.starterPrompt); }}><strong>{item.displayName}</strong><span>{item.description}</span></button>)}</div><div className="copilot-layout"><aside className="chat-list"><strong>Unterhaltungen</strong>{conversations.map(item => <button className={conversation?.id === item.id ? "active" : ""} key={item.id} onClick={() => onSelect(item.id)}><span>◌</span><div><strong>{item.title}</strong><small>{dateTime.format(new Date(item.updatedAt))}</small></div></button>)}</aside><section className="chat-panel"><div className="chat-header"><span className={`accent ${opportunity.accent}`} /><div><strong>{selectedAssistant?.displayName ?? "CRM-Assistent"}</strong><small>Kontextgrenze: {opportunity.code} · {opportunity.marker}</small></div><span className="protected">◈ geschützt</span></div><div className="messages" aria-live="polite">{messages.length ? messages.map(item => <article className={item.role} key={item.id}><span>{item.role === "assistant" ? "A" : "Sie"}</span><div><small>{item.role === "assistant" ? "AIDA" : "Ihre Aufgabe"}</small><p>{item.content}</p></div></article>) : <Empty text="Wählen Sie einen vorkonfigurierten Assistenten oder stellen Sie eine freie Frage." />}</div><form className="composer" onSubmit={send}><textarea disabled={!canWrite || Boolean(activeJob)} value={prompt} onChange={event => setPrompt(event.target.value)} maxLength={4000} placeholder={canWrite ? "Was soll der gewählte Assistent für diese Verkaufschance erledigen?" : "Ihre Rolle hat Lesezugriff."} aria-label="Aufgabe an AIDA" /><div><small>{activeJob ? `AIDA-Auftrag ${chatStatusLabel(activeJob.status)} · Ergebnis wird automatisch übernommen` : `${selectedAssistant?.outputLabel ?? "Freie Antwort"} · lokales Modellprofil bevorzugt`}</small><button className="primary" disabled={busy || Boolean(activeJob) || !prompt.trim() || !canWrite || !selectedAssistant}>{busy || activeJob ? "AIDA arbeitet …" : "Senden →"}</button></div></form></section><aside className="artifact-list"><strong>Artefakte</strong><small>Nur {opportunity.code}</small>{artifacts.length ? artifacts.map(item => <button key={item.id} onClick={() => onArtifact(item)}><span>{artifactIcon(item.kind)}</span><div><strong>{item.title}</strong><small>{dateTime.format(new Date(item.createdAt))}</small></div></button>) : <Empty text="Noch keine Ergebnisse gespeichert." />}</aside></div></>;
 }
 
 function UserAdministration({ users, currentUserId, busy, onCreate, onEdit, onUpdate }: { users: UserSummary[]; currentUserId: string; busy: boolean; onCreate: () => void; onEdit: (user: UserSummary) => void; onUpdate: (body: Record<string, unknown>) => Promise<unknown> }) { return <><div className="page-heading"><div><small>Tenantverwaltung</small><h1>CRM-Benutzer</h1><p>Diese Konten teilen sich die Verkaufschancen dieses CRM-Tenants. Rollen begrenzen Änderungen und Administration.</p></div><button className="primary" onClick={onCreate}>＋ Benutzer anlegen</button></div><section className="panel user-table"><table><thead><tr><th>Benutzer</th><th>Rolle</th><th>Status</th><th>Aktion</th></tr></thead><tbody>{users.map(user => <tr key={user.id}><td><strong>{user.displayName}</strong><small>{user.username}</small></td><td>{roleLabel(user.role)}</td><td>{user.active ? "Aktiv" : "Deaktiviert"}</td><td><div className="table-actions"><button className="secondary compact-button" disabled={busy} onClick={() => onEdit(user)}>Bearbeiten</button><button className="secondary compact-button" disabled={busy || user.id === currentUserId} onClick={() => void onUpdate({ action: "update", id: user.id, displayName: user.displayName, role: user.role, active: !user.active })}>{user.active ? "Deaktivieren" : "Aktivieren"}</button></div></td></tr>)}</tbody></table></section></>; }
@@ -325,7 +365,7 @@ function UserForm({ item, busy, onSave, onClose }: { item: UserSummary | null; b
 
 function AssistantForm({ item, busy, onSave, onClose }: { item: AssistantDefinition; busy: boolean; onSave: (values: Record<string, unknown>) => Promise<void>; onClose: () => void }) {
   async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); await onSave({ displayName: form.get("displayName"), description: form.get("description"), starterPrompt: form.get("starterPrompt"), actionInstructions: form.get("actionInstructions"), outputLabel: form.get("outputLabel"), modelProfileName: form.get("modelProfileName"), createsArtifact: form.get("createsArtifact") === "on", usesProductKnowledge: form.get("usesProductKnowledge") === "on", active: form.get("active") === "on" }); }
-  return <Dialog title={`KI-Assistent: ${item.displayName}`} onClose={onClose}><form className="form-grid assistant-form" onSubmit={submit}><TextField name="displayName" label="Anzeigename" defaultValue={item.displayName} required wide /><label className="field wide"><span>Beschreibung</span><textarea name="description" minLength={10} maxLength={500} required defaultValue={item.description} /></label><label className="field wide"><span>Vorgeschlagene Startaufgabe (Deutsch)</span><textarea name="starterPrompt" minLength={10} maxLength={2000} required defaultValue={item.starterPrompt} /></label><label className="field wide"><span>ACTION-Prompt (Englisch)</span><textarea className="prompt-editor" name="actionInstructions" minLength={80} maxLength={12000} required defaultValue={item.actionInstructions} /></label><TextField name="outputLabel" label="Artefaktbezeichnung" defaultValue={item.outputLabel ?? ""} /><TextField name="modelProfileName" label="AIDA-Modellprofil (optional)" defaultValue={item.modelProfileName ?? ""} /><label className="check-field"><input name="createsArtifact" type="checkbox" defaultChecked={item.createsArtifact} /><span>Antwort als Artefakt speichern</span></label><label className="check-field"><input name="usesProductKnowledge" type="checkbox" defaultChecked={item.usesProductKnowledge} /><span>Zentrale AIDA-Produktwissensbasis verwenden</span></label><label className="check-field"><input name="active" type="checkbox" defaultChecked={item.active} /><span>Assistent im KI-Arbeitsbereich aktiv</span></label><p className="form-help wide">Die Abschnitte ACTION, Act, Context, Task, Instructions, Output und Narrowing sind verpflichtend. Änderungen wirken für alle CRM-Benutzer dieser Installation und werden protokolliert.</p><div className="dialog-actions wide"><button type="button" className="secondary" onClick={onClose}>Abbrechen</button><button className="primary" disabled={busy}>{busy ? "Speichern …" : "Konfiguration speichern"}</button></div></form></Dialog>;
+  return <Dialog title={`KI-Assistent: ${item.displayName}`} onClose={onClose}><form className="form-grid assistant-form" onSubmit={submit}><TextField name="displayName" label="Anzeigename" defaultValue={item.displayName} required wide /><label className="field wide"><span>Beschreibung</span><textarea name="description" minLength={10} maxLength={500} required defaultValue={item.description} /></label><label className="field wide"><span>Vorgeschlagene Startaufgabe (Deutsch)</span><textarea name="starterPrompt" minLength={10} maxLength={2000} required defaultValue={item.starterPrompt} /></label><label className="field wide"><span>ACTION-Prompt (Englisch)</span><textarea className="prompt-editor" name="actionInstructions" minLength={80} maxLength={8000} required defaultValue={item.actionInstructions} /></label><TextField name="outputLabel" label="Artefaktbezeichnung" defaultValue={item.outputLabel ?? ""} /><TextField name="modelProfileName" label="AIDA-Modellprofil (optional)" defaultValue={item.modelProfileName ?? ""} /><label className="check-field"><input name="createsArtifact" type="checkbox" defaultChecked={item.createsArtifact} /><span>Antwort als Artefakt speichern</span></label><label className="check-field"><input name="usesProductKnowledge" type="checkbox" defaultChecked={item.usesProductKnowledge} /><span>Zentrale AIDA-Produktwissensbasis verwenden</span></label><label className="check-field"><input name="active" type="checkbox" defaultChecked={item.active} /><span>Assistent im KI-Arbeitsbereich aktiv</span></label><p className="form-help wide">Die Abschnitte ACTION, Act, Context, Task, Instructions, Output und Narrowing sind verpflichtend. Änderungen wirken für alle CRM-Benutzer dieser Installation und werden protokolliert.</p><div className="dialog-actions wide"><button type="button" className="secondary" onClick={onClose}>Abbrechen</button><button className="primary" disabled={busy}>{busy ? "Speichern …" : "Konfiguration speichern"}</button></div></form></Dialog>;
 }
 
 function ArtifactDialog({ item, onClose }: { item: Artifact; onClose: () => void }) { return <Dialog title={item.title} onClose={onClose}><div className="artifact-content">{item.content}</div><div className="dialog-actions"><a className="secondary link-button" href={`/api/artifacts/${item.id}`}>Markdown herunterladen</a><button className="secondary" onClick={() => navigator.clipboard.writeText(item.content)}>Kopieren</button><button className="primary" onClick={onClose}>Schließen</button></div></Dialog>; }
@@ -339,43 +379,9 @@ function Empty({ text }: { text: string }) { return <div className="empty">{text
 function Loading({ error }: { error: string }) { return <main className="loading"><div className="brand-mark">A</div><h1>AIDA CRM</h1><p>{error || "Der geschützte Arbeitsbereich wird vorbereitet …"}</p></main>; }
 function activityType(type: Activity["type"]) { return ({ appointment: "Termin", todo: "Aufgabe", note: "Notiz" })[type]; }
 function artifactIcon(kind: string) { return ({ "meeting-briefing": "◷", "email-drafter": "✉", "risk-analyst": "△", "offer-author": "▤", "feasibility-analyst": "◇", "implementation-handout": "☷", "aida-gap-analyst": "⚙" } as Record<string, string>)[kind] ?? "✦"; }
+function chatStatusLabel(status: ChatDispatch["status"]) { return ({ Submitting: "wird übergeben", Queued: "wartet", Processing: "wird verarbeitet" })[status]; }
 function roleLabel(role: CrmRole) { return ({ admin: "Administrator", sales: "Vertrieb", reader: "Leser" })[role]; }
 function formatBytes(value: number) { return value < 1024 ? `${value} B` : `${Math.round(value / 1024)} KB`; }
 function localDateTime(value: string) { const dateValue = new Date(value); const offset = dateValue.getTimezoneOffset() * 60_000; return new Date(dateValue.getTime() - offset).toISOString().slice(0, 16); }
 function initials(value: string) { return value.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "A"; }
 function messageOf(value: unknown) { return value instanceof Error ? value.message : "Ein unerwarteter Fehler ist aufgetreten."; }
-
-async function readChatResponse(response: Response) {
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/x-ndjson") || !response.body) {
-    const text = await response.text();
-    const body = parseJsonRecord(text);
-    if (!response.ok) throw new Error(typeof body?.message === "string"
-      ? body.message : "AIDA konnte die Aufgabe nicht ausführen.");
-    return;
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let pending = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    pending += decoder.decode(value, { stream: !done });
-    const lines = pending.split("\n");
-    pending = lines.pop() ?? "";
-    for (const line of lines) {
-      const event = parseJsonRecord(line);
-      if (event?.type === "error") {
-        throw new Error(typeof event.message === "string"
-          ? event.message : "AIDA konnte die Aufgabe nicht ausführen.");
-      }
-    }
-    if (done) break;
-  }
-}
-
-function parseJsonRecord(value: string) {
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
-  } catch { return null; }
-}

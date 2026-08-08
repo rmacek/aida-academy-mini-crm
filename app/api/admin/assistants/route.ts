@@ -66,7 +66,7 @@ function optionalText(value: unknown, max: number) {
   return validText(value, 1, max);
 }
 function validActionPrompt(value: unknown) {
-  const text = validText(value, 80, 12_000);
+  const text = validText(value, 80, 8_000);
   if (!text) return null;
   const headings = ["ACTION", "Act", "Context", "Task", "Instructions", "Output", "Narrowing"];
   return headings.every(heading => new RegExp(`(^|\\n)${heading}\\s*($|\\n)`, "i").test(text)) ? text : null;

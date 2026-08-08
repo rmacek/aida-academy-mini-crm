@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const version = "1.0.13";
+const version = "1.0.14";
 const chartRoot = new URL("../deploy/olares/aidacrm/", import.meta.url);
 
 test("all app and Olares package version surfaces are aligned", async () => {
@@ -37,7 +37,7 @@ test("Marketplace scanners can resolve the immutable runtime image", async () =>
   );
 });
 
-test("allows long HTTPS AIDA calls and database egress only", async () => {
+test("allows asynchronous HTTPS AIDA jobs and database egress only", async () => {
   const [networkPolicy, manifest] = await Promise.all([
     readFile(new URL("templates/network-policy.yaml", chartRoot), "utf8"),
     readFile(new URL("OlaresManifest.yaml", chartRoot), "utf8"),

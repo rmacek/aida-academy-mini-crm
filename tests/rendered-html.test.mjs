@@ -42,7 +42,7 @@ test("loads CRM assistants dynamically and keeps the AIDA token server-side", as
   assert.match(workspace, /Kontext geschützt/);
   assert.match(workspace, /KI-Arbeitsbereich/);
   assert.match(chat, /FROM assistant_definitions WHERE assistant_key=\$1 AND active/);
-  assert.match(chat, /Work exclusively with the ACTIVE OPPORTUNITY SNAPSHOT/);
+  assert.match(chat, /Work exclusively with the ACTIVE OPPORTUNITY BOUNDARY and SNAPSHOT/);
   assert.match(chat, /cloudProcessingConfirmed: false/);
   assert.match(database, /function assistantActionPrompt/);
   assert.match(database, /definition\[7\]/);
@@ -50,15 +50,16 @@ test("loads CRM assistants dynamically and keeps the AIDA token server-side", as
   assert.match(schema, /ELSE false/);
   assert.match(chat, /function aidaErrorMessage/);
   assert.match(chat, /Object\.values\(candidate\.errors\)/);
-  assert.match(chat, /application\/x-ndjson/);
-  assert.match(chat, /type: "progress"/);
-  assert.match(chat, /\/api\/v1\/chat\/messages\/stream/);
-  assert.match(chat, /application\/x-ndjson/);
-  assert.match(chat, /function readAidaStream/);
+  assert.match(chat, /\/api\/v1\/chat\/jobs/);
+  assert.match(chat, /status === "Queued" \|\| aida\.status === "Processing"/);
+  assert.match(chat, /chat_dispatches/);
+  assert.match(chat, /FOR UPDATE/);
+  assert.match(chat, /expectedAidaConversationId/);
   assert.match(chat, /return url\.protocol === "https:"/);
   assert.doesNotMatch(chat, /svc\.cluster\.local|url\.port === "80"/);
-  assert.match(workspace, /response\.body\.getReader\(\)/);
-  assert.match(workspace, /"x-envoy-upstream-rq-timeout-ms": "180000"/);
+  assert.match(workspace, /method: "PATCH"/);
+  assert.match(workspace, /Ergebnis wird automatisch übernommen/);
+  assert.doesNotMatch(workspace, /x-envoy-upstream-rq-timeout-ms/);
   assert.match(database, /return `ACTION\n/);
   for (const heading of ["Act", "Context", "Task", "Instructions", "Output", "Narrowing"]) {
     assert.match(database, new RegExp(`\\n${heading}\\n`));
@@ -99,6 +100,8 @@ test("packages an independently installable PostgreSQL-backed Marketplace app", 
   assert.match(schema, /kind varchar\(60\) NOT NULL/);
   assert.match(schema, /content bytea NOT NULL/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS assistant_definitions/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS chat_dispatches/);
+  assert.match(schema, /chat_dispatches_one_active_conversation/);
   assert.match(nextConfig, /Content-Security-Policy/);
   assert.match(exampleEnv, /CRM_BOOTSTRAP_ADMIN_PASSWORD=iqx4academy2026\./);
   assert.match(apiUser, /CRM_PUBLIC_ORIGIN/);

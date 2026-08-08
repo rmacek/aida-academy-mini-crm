@@ -101,6 +101,16 @@ export type AssistantDefinition = {
   active: boolean;
 };
 
+export type ChatDispatch = {
+  id: string;
+  opportunityId: string;
+  conversationId: string;
+  assistantKey: string;
+  status: "Submitting" | "Queued" | "Processing";
+  submittedAt: string;
+  updatedAt: string;
+};
+
 export function runtimeEnv() {
   return {
     AIDA_API_BASE_URL: process.env.AIDA_API_BASE_URL?.trim(),
@@ -112,7 +122,8 @@ export function runtimeEnv() {
 }
 
 export async function readWorkspace(user: CrmUser) {
-  const [opportunities, activities, documents, conversations, messages, artifacts, users, assistants, assistantDefinitions] =
+  const [opportunities, activities, documents, conversations, messages, artifacts, chatDispatches,
+    users, assistants, assistantDefinitions] =
     await Promise.all([
       query<Opportunity>(`SELECT o.id, o.code, o.name, o.customer,
         o.value_eur::float8 AS value, o.stage, o.probability,
@@ -139,6 +150,11 @@ export async function readWorkspace(user: CrmUser) {
       query<Artifact>(`SELECT id, opportunity_id AS "opportunityId",
         conversation_id AS "conversationId", kind, title, content,
         created_at AS "createdAt" FROM artifacts ORDER BY created_at DESC`),
+      query<ChatDispatch>(`SELECT id, opportunity_id AS "opportunityId",
+        conversation_id AS "conversationId", assistant_key AS "assistantKey", status,
+        submitted_at AS "submittedAt", updated_at AS "updatedAt"
+        FROM chat_dispatches WHERE status IN ('Submitting', 'Queued', 'Processing')
+        ORDER BY submitted_at`),
       user.role === "admin"
         ? query<UserSummary>(`SELECT id, username, display_name AS "displayName", role, active
             FROM users ORDER BY lower(username)`)
@@ -172,6 +188,7 @@ export async function readWorkspace(user: CrmUser) {
     conversations: conversations.rows,
     messages: messages.rows,
     artifacts: artifacts.rows,
+    chatDispatches: chatDispatches.rows,
     users: users.rows,
     assistants: assistants.rows,
     assistantDefinitions: assistantDefinitions.rows,

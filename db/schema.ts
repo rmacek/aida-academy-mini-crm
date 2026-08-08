@@ -198,3 +198,41 @@ ALTER TABLE documents ADD COLUMN IF NOT EXISTS content bytea;
 UPDATE documents SET content = decode('', 'hex') WHERE content IS NULL;
 ALTER TABLE documents ALTER COLUMN content SET NOT NULL;
 `;
+
+export const migrationSix = `
+CREATE TABLE IF NOT EXISTS chat_dispatches (
+  id uuid PRIMARY KEY,
+  aida_job_id uuid UNIQUE,
+  opportunity_id uuid NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  expected_aida_conversation_id uuid NOT NULL,
+  assistant_key varchar(60) NOT NULL,
+  prompt text NOT NULL CHECK (char_length(prompt) BETWEEN 1 AND 4000),
+  output_label varchar(180),
+  creates_artifact boolean NOT NULL,
+  submitted_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  status varchar(20) NOT NULL CHECK (
+    status IN ('Submitting', 'Queued', 'Processing', 'Succeeded', 'Failed')),
+  error_message varchar(1000),
+  profile_name varchar(180),
+  model_name varchar(180),
+  used_fallback boolean,
+  submitted_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  completed_at timestamptz,
+  CHECK ((status IN ('Submitting', 'Queued', 'Processing')
+          AND completed_at IS NULL AND error_message IS NULL)
+      OR (status = 'Succeeded'
+          AND completed_at IS NOT NULL AND error_message IS NULL)
+      OR (status = 'Failed'
+          AND completed_at IS NOT NULL AND error_message IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS chat_dispatches_one_active_conversation
+  ON chat_dispatches(conversation_id)
+  WHERE status IN ('Submitting', 'Queued', 'Processing');
+CREATE INDEX IF NOT EXISTS chat_dispatches_opportunity_updated
+  ON chat_dispatches(opportunity_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS chat_dispatches_retention
+  ON chat_dispatches(completed_at)
+  WHERE completed_at IS NOT NULL;
+`;
