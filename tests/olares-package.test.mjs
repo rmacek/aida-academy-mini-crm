@@ -2,15 +2,16 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const version = "1.0.11";
+const version = "1.0.12";
 const chartRoot = new URL("../deploy/olares/aidacrm/", import.meta.url);
 
 test("all app and Olares package version surfaces are aligned", async () => {
-  const [packageJson, packageLock, chart, manifest] = await Promise.all([
+  const [packageJson, packageLock, chart, manifest, dockerfile] = await Promise.all([
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../package-lock.json", import.meta.url), "utf8"),
     readFile(new URL("Chart.yaml", chartRoot), "utf8"),
     readFile(new URL("OlaresManifest.yaml", chartRoot), "utf8"),
+    readFile(new URL("../Dockerfile", import.meta.url), "utf8"),
   ]);
 
   assert.equal(JSON.parse(packageJson).version, version);
@@ -19,6 +20,7 @@ test("all app and Olares package version surfaces are aligned", async () => {
   assert.match(chart, new RegExp(`^appVersion: ${version.replaceAll(".", "\\.")}$`, "m"));
   assert.match(manifest, new RegExp(`^  version: '${version.replaceAll(".", "\\.")}'$`, "m"));
   assert.match(manifest, new RegExp(`^  versionName: '${version.replaceAll(".", "\\.")}'$`, "m"));
+  assert.match(dockerfile, new RegExp(`^ARG VERSION=${version.replaceAll(".", "\\.")}$`, "m"));
 });
 
 test("Marketplace scanners can resolve the immutable runtime image", async () => {
@@ -35,14 +37,16 @@ test("Marketplace scanners can resolve the immutable runtime image", async () =>
   );
 });
 
-test("allows HTTPS, restricted in-cluster AIDA, and database egress ports", async () => {
-  const networkPolicy = await readFile(
-    new URL("templates/network-policy.yaml", chartRoot),
-    "utf8",
-  );
+test("allows long HTTPS AIDA calls and database egress only", async () => {
+  const [networkPolicy, manifest] = await Promise.all([
+    readFile(new URL("templates/network-policy.yaml", chartRoot), "utf8"),
+    readFile(new URL("OlaresManifest.yaml", chartRoot), "utf8"),
+  ]);
 
   assert.match(networkPolicy, /port: 443\n/);
-  assert.match(networkPolicy, /port: 80\n/);
-  assert.match(networkPolicy, /port: 8080\n/);
   assert.match(networkPolicy, /port: 5432\n/);
+  assert.doesNotMatch(networkPolicy, /port: 80\n/);
+  assert.doesNotMatch(networkPolicy, /port: 8080\n/);
+  assert.match(manifest, /^  apiTimeout: 0$/m);
+  assert.match(manifest, /regex: '\^https:\/\/\[\^\?\#\]\+\$'/);
 });

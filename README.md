@@ -70,7 +70,7 @@ synthetische Verkaufschancen für den Isolationstest.
 | `CRM_TENANT_NAME` | Sichtbarer Name des gemeinsamen CRM-Arbeitsbereichs |
 | `CRM_BOOTSTRAP_ADMIN_USERNAME` | Erster CRM-Administrator bei leerer Datenbank |
 | `CRM_BOOTSTRAP_ADMIN_PASSWORD` | Initialpasswort; Wechsel bei erster Anmeldung |
-| `AIDA_API_BASE_URL` | HTTPS-Adresse oder interner Olares-Dienstname der AIDA-Instanz |
+| `AIDA_API_BASE_URL` | Öffentliche HTTPS-Adresse der AIDA-Instanz |
 | `AIDA_SERVICE_TOKEN` | Tenantgebundener Service-Account-Token |
 | `AIDA_MODEL_PROFILE_NAME` | Kostenoptimiertes Standard-Modellprofil |
 | `AIDA_PRODUCT_KNOWLEDGE_BASE_ID` | Freigegebene AIDA-Produktwissensbasis |
@@ -80,12 +80,10 @@ synthetische Verkaufschancen für den Isolationstest.
 Das Chart liegt unter `deploy/olares/aidacrm`. Es unterstützt mehrere unabhängige
 Installationen, bezieht PostgreSQL über Olares-Middleware und läuft ohne Root,
 privilegierte Linux-Capabilities oder beschreibbares Root-Dateisystem. Das CRM
-akzeptiert externe AIDA-Ziele ausschließlich per HTTPS. Innerhalb desselben
-Olares-Clusters darf zusätzlich nur ein HTTP-Dienstname unter
-`.svc.cluster.local` auf Port 80 verwendet werden. Dieser direkte Dienstweg
-umgeht das feste Zeitlimit des öffentlichen Edge-Proxys bei langen Modellläufen;
-die versionierte NDJSON-API von AIDA und der Antwortstrom des CRM senden
-zusätzlich regelmäßig Heartbeats.
+akzeptiert AIDA-Ziele ausschließlich per HTTPS. `spec.apiTimeout: 0` im
+Olares-Manifest erlaubt lange lokale Modellläufe ohne das standardmäßige
+15-Sekunden-Zeitlimit. Die versionierte NDJSON-API von AIDA und der
+Antwortstrom des CRM senden zusätzlich regelmäßig Heartbeats.
 
 ## Kontrollierte Veröffentlichung
 

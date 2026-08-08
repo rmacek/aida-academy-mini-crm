@@ -10,7 +10,7 @@ metadata:
   title: AIDA CRM
   description: Mehrbenutzerfähiges CRM für Verkaufschancen mit kontextisolierten AIDA-Assistenten.
   icon: https://raw.githubusercontent.com/rmacek/aida-academy-mini-crm/main/public/market-icon.webp
-  version: '1.0.11'
+  version: '1.0.12'
   categories:
     - Productivity_v112
 
@@ -24,7 +24,8 @@ entrances:
     openMethod: window
 
 spec:
-  versionName: '1.0.11'
+  versionName: '1.0.12'
+  apiTimeout: 0
   fullDescription: |
     AIDA CRM verwaltet Verkaufschancen, Kunden-UseCases, Termine, Aufgaben,
     Notizen, Dokumente, Unterhaltungen und KI-Artefakte. Vorkonfigurierte,
@@ -101,8 +102,8 @@ envs:
     editable: true
     applyOnChange: true
     type: string
-    regex: '^(https://[^?#]+|http://[a-z0-9.-]+\.svc\.cluster\.local(:80)?(/[^?#]*)?)$'
-    description: HTTPS-Adresse oder interner Olares-Dienstname der AIDA-Instanz. Für lange Modellläufe im selben Cluster wird der interne Dienstname empfohlen.
+    regex: '^https://[^?#]+$'
+    description: Öffentliche HTTPS-Adresse der AIDA-Instanz. Das App-Manifest erlaubt lange Modellläufe ohne Proxy-Zeitlimit.
   - envName: AIDA_MODEL_PROFILE_NAME
     required: true
     default: Local Primary - Coding
