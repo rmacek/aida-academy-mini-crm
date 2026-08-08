@@ -10,7 +10,7 @@ metadata:
   title: AIDA CRM
   description: Mehrbenutzerfähiges CRM für Verkaufschancen mit kontextisolierten AIDA-Assistenten.
   icon: https://raw.githubusercontent.com/rmacek/aida-academy-mini-crm/main/public/market-icon.webp
-  version: '1.0.9'
+  version: '1.0.10'
   categories:
     - Productivity_v112
 
@@ -24,7 +24,7 @@ entrances:
     openMethod: window
 
 spec:
-  versionName: '1.0.9'
+  versionName: '1.0.10'
   fullDescription: |
     AIDA CRM verwaltet Verkaufschancen, Kunden-UseCases, Termine, Aufgaben,
     Notizen, Dokumente, Unterhaltungen und KI-Artefakte. Vorkonfigurierte,
@@ -34,8 +34,8 @@ spec:
     berechtigten CRM-Benutzer der Installation arbeiten in demselben
     Unternehmenskontext; andere Installationen bleiben getrennt.
   upgradeDescription: |
-    Unterstützt lange lokale Modellläufe über einen Heartbeat-Antwortstrom und
-    eine explizit konfigurierte clusterinterne AIDA-Serviceadresse.
+    Unterstützt lange lokale Modellläufe Ende-zu-Ende über die versionierte,
+    gestreamte AIDA-API mit regelmäßigen Heartbeats.
   developer: Ronald Macek
   website: https://github.com/rmacek/aida-academy-mini-crm
   sourceCode: https://github.com/rmacek/aida-academy-mini-crm
@@ -101,8 +101,8 @@ envs:
     editable: true
     applyOnChange: true
     type: string
-    regex: '^(https://[^?#]+|http://aida\.aida-[a-z0-9-]+\.svc\.cluster\.local)$'
-    description: HTTPS-Adresse oder interne Olares-Serviceadresse der AIDA-Instanz. Intern verhindert Proxy-Zeitlimits bei langen lokalen Modellläufen.
+    regex: '^https://[^?#]+$'
+    description: Öffentliche HTTPS-Adresse der AIDA-Instanz. Die gestreamte API verhindert Proxy-Zeitlimits bei langen Modellläufen.
   - envName: AIDA_MODEL_PROFILE_NAME
     required: true
     default: Local Primary - Coding

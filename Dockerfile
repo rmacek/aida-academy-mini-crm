@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build
 
 FROM node:24.6.0-alpine3.22 AS runtime
-ARG VERSION=1.0.9
+ARG VERSION=1.0.10
 ARG SOURCE_URL=https://github.com/rmacek/aida-academy-mini-crm
 LABEL org.opencontainers.image.title="AIDA CRM" \
       org.opencontainers.image.description="Tenant-installable multi-user CRM with contextual AIDA assistants" \

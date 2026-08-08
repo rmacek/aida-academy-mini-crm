@@ -29,6 +29,14 @@ type AidaResponse = {
   usedFallback: boolean;
 };
 
+type AidaStreamEvent = {
+  type?: string;
+  response?: AidaResponse;
+  status?: number;
+  code?: string;
+  message?: string;
+};
+
 class ChatExecutionError extends Error {}
 
 export async function POST(request: Request) {
@@ -104,14 +112,14 @@ export async function POST(request: Request) {
   const submittedAt = new Date();
   const requestedConversationId = conversation.aidaConversationId ? null : crypto.randomUUID();
   return streamedChat(async () => {
-    const response = await fetch(new URL("/api/v1/chat/messages", baseUrl), {
+    const response = await fetch(new URL("/api/v1/chat/messages/stream", baseUrl), {
       method: "POST",
       redirect: "error",
       signal: AbortSignal.timeout(180_000),
       headers: {
         authorization: `Bearer ${runtime.AIDA_SERVICE_TOKEN}`,
         "content-type": "application/json",
-        accept: "application/json",
+        accept: "application/x-ndjson",
       },
       body: JSON.stringify({
         modelProfileName: assistant.modelProfileName || runtime.AIDA_MODEL_PROFILE_NAME,
@@ -127,10 +135,11 @@ export async function POST(request: Request) {
       }),
     }).catch(() => null);
     if (!response) throw new ChatExecutionError("AIDA ist derzeit nicht erreichbar.");
-    const responseText = await response.text();
-    const detail = parseJson(responseText);
-    if (!response.ok) throw new ChatExecutionError(aidaErrorMessage(detail, response.status));
-    const aida = detail as AidaResponse | null;
+    if (!response.ok) {
+      const detail = parseJson(await response.text());
+      throw new ChatExecutionError(aidaErrorMessage(detail, response.status));
+    }
+    const aida = await readAidaStream(response);
     if (!aida?.answer || aida.answer.length > 100_000 || !validUuid(aida.conversationId)) {
       throw new ChatExecutionError("AIDA hat keine verwertbare Antwort geliefert.");
     }
@@ -202,11 +211,37 @@ function parseJson(value: string): unknown {
   try { return JSON.parse(value); } catch { return null; }
 }
 
+async function readAidaStream(response: Response): Promise<AidaResponse> {
+  if (!response.body) throw new ChatExecutionError("AIDA hat keinen Antwortstrom geliefert.");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+      const lines = buffer.split("\n");
+      buffer = done ? "" : lines.pop() ?? "";
+      for (const line of lines) {
+        const event = parseJson(line.trim()) as AidaStreamEvent | null;
+        if (!event) continue;
+        if (event.type === "complete" && event.response) return event.response;
+        if (event.type === "error") {
+          throw new ChatExecutionError(event.message?.trim() ||
+            `AIDA antwortete mit HTTP ${event.status || 500}.`);
+        }
+      }
+      if (done) break;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  throw new ChatExecutionError("AIDA hat den Antwortstrom ohne Ergebnis beendet.");
+}
+
 function validAidaBaseUrl(url: URL) {
   if (url.username || url.password || url.search || url.hash) return false;
-  if (url.protocol === "https:") return true;
-  return url.protocol === "http:" && !url.port
-    && /^aida\.aida-[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.svc\.cluster\.local$/i.test(url.hostname);
+  return url.protocol === "https:";
 }
 
 function aidaErrorMessage(payload: unknown, status: number) {
