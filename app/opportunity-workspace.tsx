@@ -255,7 +255,7 @@ function EmptyWorkspace({ data, busy, error, onLogout, onCreate, editor, onClose
   return <main className="auth-shell"><section className="auth-card wide"><div className="brand-mark">A</div><small>{data.tenant}</small><h1>Noch keine Verkaufschance</h1><p>Legen Sie die erste Verkaufschance an. Danach können alle berechtigten Mitarbeiter gemeinsam daran arbeiten.</p>{error && <div className="alert">{error}</div>}<div className="dialog-actions"><button className="secondary" onClick={onLogout}>Abmelden</button>{data.permissions.canWrite && <button className="primary" onClick={onCreate}>Verkaufschance anlegen</button>}</div></section>{editor && <OpportunityForm item={null} busy={busy} onClose={onClose} onSave={onSave} />}</main>;
 }
 
-function Nav({ active, icon, label, badge, onClick }: { active: boolean; icon: string; label: string; badge?: number; onClick: () => void }) { return <button className={active ? "active" : ""} onClick={onClick}><span aria-hidden="true">{icon}</span>{label}{badge !== undefined && <i>{badge}</i>}</button>; }
+function Nav({ active, icon, label, badge, onClick }: { active: boolean; icon: string; label: string; badge?: number; onClick: () => void }) { return <button className={active ? "active" : ""} aria-current={active ? "page" : undefined} onClick={onClick}><span aria-hidden="true">{icon}</span>{label}{badge !== undefined && <i>{badge}</i>}</button>; }
 
 function Dashboard({ user, opportunities, activities, canWrite, onOpen, onCreate }: { user: CrmUser; opportunities: Opportunity[]; activities: Activity[]; canWrite: boolean; onOpen: (id: string) => void; onCreate: () => void }) {
   const [now] = useState(Date.now);
