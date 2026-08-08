@@ -1,6 +1,6 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { hashPassword } from "../lib/passwords";
-import { migrationOne, migrationThree, migrationTwo } from "./schema";
+import { migrationFour, migrationOne, migrationThree, migrationTwo } from "./schema";
 
 declare global {
   var __aidaCrmPool: Pool | undefined;
@@ -67,7 +67,7 @@ async function migrateAndBootstrap() {
     await client.query("SELECT pg_advisory_lock($1)", [740_210_026]);
     await client.query("BEGIN");
     await client.query("CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
-    const migrations = [[1, migrationOne], [2, migrationTwo], [3, migrationThree]] as const;
+    const migrations = [[1, migrationOne], [2, migrationTwo], [3, migrationThree], [4, migrationFour]] as const;
     for (const [version, sql] of migrations) {
       const current = await client.query<{ version: number }>(
         "SELECT version FROM schema_migrations WHERE version = $1", [version]);
@@ -143,27 +143,27 @@ async function seedSampleData(client: PoolClient, adminId: string) {
 
 async function seedAssistantDefinitions(client: PoolClient) {
   const definitions = [
-    ["sales-copilot", "Vertriebs-Copilot", "Beantwortet freie Fragen zur aktiven Verkaufschance und schlägt den nächsten sinnvollen Schritt vor.", "Welche nächsten Schritte empfiehlst du für diese Verkaufschance?", "Answer the user's question directly. Separate facts, assumptions, and open questions, then propose the next practical sales step.", null, false],
-    ["meeting-briefing", "Meeting-Briefing", "Bereitet Kundentermine aus dem aktuellen Kontext vor.", "Bereite mich auf den nächsten Kundentermin vor. Fasse Ziele, offene Fragen, mögliche Einwände und den empfohlenen nächsten Schritt zusammen.", "Create a concise German meeting briefing with goals, agenda, known facts, open questions, likely objections, response options, and a concrete next step.", "Meeting-Briefing", true],
-    ["email-drafter", "E-Mail-Autor", "Erstellt versandfertige E-Mail-Entwürfe, die ein Mensch freigibt.", "Entwirf eine freundliche Follow-up-E-Mail zum aktuellen Stand mit einem konkreten nächsten Schritt.", "Draft a professional German email with subject, body, clearly marked assumptions, and a call to action. Never claim that the email was sent.", "E-Mail-Entwurf", true],
-    ["risk-analyst", "Risikoanalyst", "Bewertet Vertriebs-, Sicherheits- und Umsetzungsrisiken.", "Analysiere die wichtigsten Vertriebs- und Umsetzungsrisiken. Trenne Fakten, Annahmen und offene Fragen.", "Create a ranked German risk analysis with evidence, likelihood, impact, mitigation, owner proposal, and open questions.", "Risikoanalyse", true],
-    ["offer-author", "Angebotsautor", "Erstellt Angebotsbausteine mit Scope und Abgrenzungen.", "Erstelle einen Angebotsbaustein mit Kundennutzen, Leistungsumfang, Annahmen und Abgrenzungen.", "Draft a structured German offer component with customer value, deliverables, scope, assumptions, exclusions, acceptance, and open commercial questions.", "Angebotsbaustein", true],
-    ["feasibility-analyst", "Machbarkeitsanalyst", "Prüft einen Kunden-UseCase fachlich, technisch und organisatorisch.", "Prüfe den Kunden-UseCase auf Umsetzbarkeit und gib eine klare, begründete Empfehlung.", "Assess feasibility in German. Separate verified facts, assumptions, and missing evidence. Cover prerequisites, architecture, data, security, privacy, integration, operations, effort drivers, risks, a recommended proof of concept, and a clear go, conditional-go, or no-go recommendation.", "Machbarkeitsprüfung", true],
-    ["implementation-handout", "Umsetzungs-Handout-Autor", "Erstellt ein praxisnahes, detailliertes Handout für den konkreten Kunden-UseCase.", "Erstelle ein detailliertes Handout, das zeigt, wie dieser Kunden-UseCase mit AIDA umgesetzt und geprüft wird.", "Create a detailed German implementation handout in Markdown. Include objective, expected result, prerequisites, exact verified AIDA navigation and field values, English ACTION copy-and-paste prompts, configuration, security boundaries, implementation steps, tests, acceptance criteria, troubleshooting, rollout, operation, and cleanup. Mark every unverified UI label or unavailable feature explicitly; never invent product capabilities.", "Umsetzungs-Handout", true],
-    ["aida-gap-analyst", "AIDA-Gap-Analyst", "Erkennt fehlende generische AIDA-Funktionen und formuliert releasefähige Spezifikationen.", "Prüfe, welche generischen AIDA-Funktionen für diesen Kunden-UseCase fehlen, und spezifiere ausschließlich belegte Lücken.", "Compare the use case with the available AIDA product knowledge. List only evidenced gaps. For each real gap, create a German feature specification with user value, problem, scope, non-goals, functional requirements, security and privacy requirements, Given/When/Then acceptance criteria, dependencies, migration needs, and test requirements. Put uncertain items under open questions, not gaps. Never propose CRM-specific logic for AIDA core.", "AIDA-Feature-Spezifikation", true],
+    ["sales-copilot", "Vertriebs-Copilot", "Beantwortet freie Fragen zur aktiven Verkaufschance und schlägt den nächsten sinnvollen Schritt vor.", "Welche nächsten Schritte empfiehlst du für diese Verkaufschance?", "Answer the user's question directly. Separate facts, assumptions, and open questions, then propose the next practical sales step.", null, false, false],
+    ["meeting-briefing", "Meeting-Briefing", "Bereitet Kundentermine aus dem aktuellen Kontext vor.", "Bereite mich auf den nächsten Kundentermin vor. Fasse Ziele, offene Fragen, mögliche Einwände und den empfohlenen nächsten Schritt zusammen.", "Create a concise German meeting briefing with goals, agenda, known facts, open questions, likely objections, response options, and a concrete next step.", "Meeting-Briefing", true, false],
+    ["email-drafter", "E-Mail-Autor", "Erstellt versandfertige E-Mail-Entwürfe, die ein Mensch freigibt.", "Entwirf eine freundliche Follow-up-E-Mail zum aktuellen Stand mit einem konkreten nächsten Schritt.", "Draft a professional German email with subject, body, clearly marked assumptions, and a call to action. Never claim that the email was sent.", "E-Mail-Entwurf", true, false],
+    ["risk-analyst", "Risikoanalyst", "Bewertet Vertriebs-, Sicherheits- und Umsetzungsrisiken.", "Analysiere die wichtigsten Vertriebs- und Umsetzungsrisiken. Trenne Fakten, Annahmen und offene Fragen.", "Create a ranked German risk analysis with evidence, likelihood, impact, mitigation, owner proposal, and open questions.", "Risikoanalyse", true, false],
+    ["offer-author", "Angebotsautor", "Erstellt Angebotsbausteine mit Scope und Abgrenzungen.", "Erstelle einen Angebotsbaustein mit Kundennutzen, Leistungsumfang, Annahmen und Abgrenzungen.", "Draft a structured German offer component with customer value, deliverables, scope, assumptions, exclusions, acceptance, and open commercial questions.", "Angebotsbaustein", true, true],
+    ["feasibility-analyst", "Machbarkeitsanalyst", "Prüft einen Kunden-UseCase fachlich, technisch und organisatorisch.", "Prüfe den Kunden-UseCase auf Umsetzbarkeit und gib eine klare, begründete Empfehlung.", "Assess feasibility in German. Separate verified facts, assumptions, and missing evidence. Cover prerequisites, architecture, data, security, privacy, integration, operations, effort drivers, risks, a recommended proof of concept, and a clear go, conditional-go, or no-go recommendation.", "Machbarkeitsprüfung", true, true],
+    ["implementation-handout", "Umsetzungs-Handout-Autor", "Erstellt ein praxisnahes, detailliertes Handout für den konkreten Kunden-UseCase.", "Erstelle ein detailliertes Handout, das zeigt, wie dieser Kunden-UseCase mit AIDA umgesetzt und geprüft wird.", "Create a detailed German implementation handout in Markdown. Include objective, expected result, prerequisites, exact verified AIDA navigation and field values, English ACTION copy-and-paste prompts, configuration, security boundaries, implementation steps, tests, acceptance criteria, troubleshooting, rollout, operation, and cleanup. Mark every unverified UI label or unavailable feature explicitly; never invent product capabilities.", "Umsetzungs-Handout", true, true],
+    ["aida-gap-analyst", "AIDA-Gap-Analyst", "Erkennt fehlende generische AIDA-Funktionen und formuliert releasefähige Spezifikationen.", "Prüfe, welche generischen AIDA-Funktionen für diesen Kunden-UseCase fehlen, und spezifiere ausschließlich belegte Lücken.", "Compare the use case with the available AIDA product knowledge. List only evidenced gaps. For each real gap, create a German feature specification with user value, problem, scope, non-goals, functional requirements, security and privacy requirements, Given/When/Then acceptance criteria, dependencies, migration needs, and test requirements. Put uncertain items under open questions, not gaps. Never propose CRM-specific logic for AIDA core.", "AIDA-Feature-Spezifikation", true, true],
   ] as const;
   for (const definition of definitions) {
     await client.query(
       `INSERT INTO assistant_definitions
         (assistant_key,display_name,description,starter_prompt,action_instructions,output_label,creates_artifact,uses_product_knowledge)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,true) ON CONFLICT (assistant_key) DO NOTHING`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (assistant_key) DO NOTHING`,
       [definition[0], definition[1], definition[2], definition[3],
-        assistantActionPrompt(definition[1], definition[4]), definition[5], definition[6]],
+        assistantActionPrompt(definition[1], definition[4], definition[7]), definition[5], definition[6], definition[7]],
     );
   }
 }
 
-function assistantActionPrompt(name: string, taskInstructions: string) {
+function assistantActionPrompt(name: string, taskInstructions: string, usesProductKnowledge: boolean) {
   return `ACTION
 
 Act
@@ -181,6 +181,7 @@ Instructions
 - Never infer, retrieve, confirm, or mention information from another sales opportunity.
 - Do not claim that an external action was executed unless the runtime provides evidence.
 - Prefer the configured local model. A cloud fallback may be used only when the AIDA model profile permits it and the required data-processing approval exists.
+${usesProductKnowledge ? "- Support every AIDA product capability claim with approved AIDA product knowledge. If the knowledge base does not support a claim, label it NOT DOCUMENTED instead of guessing." : ""}
 
 Output
 Return a finished, practical work product that can be reviewed by a human before further use.

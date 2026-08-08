@@ -127,9 +127,9 @@ export async function POST(request: Request) {
     return Response.json({ error: "aida_unavailable", message: "AIDA ist derzeit nicht erreichbar." }, { status: 503 });
   }
   if (!response.ok) {
-    const detail = await response.json().catch(() => null) as { detail?: string } | null;
+    const detail = await response.json().catch(() => null) as unknown;
     return Response.json(
-      { error: "aida_request_failed", message: detail?.detail ?? `AIDA antwortete mit HTTP ${response.status}.` },
+      { error: "aida_request_failed", message: aidaErrorMessage(detail, response.status) },
       { status: response.status >= 500 ? 503 : 422 },
     );
   }
@@ -166,6 +166,24 @@ export async function POST(request: Request) {
     profileName: aida.profileName,
     modelName: aida.modelName,
   });
+}
+
+function aidaErrorMessage(payload: unknown, status: number) {
+  if (payload && typeof payload === "object") {
+    const candidate = payload as { detail?: unknown; errors?: unknown; message?: unknown };
+    if (typeof candidate.detail === "string" && candidate.detail.trim()) return candidate.detail;
+    if (typeof candidate.message === "string" && candidate.message.trim()) return candidate.message;
+    if (candidate.errors && typeof candidate.errors === "object") {
+      for (const value of Object.values(candidate.errors)) {
+        if (Array.isArray(value)) {
+          const first = value.find(item => typeof item === "string" && item.trim());
+          if (typeof first === "string") return first;
+        }
+        if (typeof value === "string" && value.trim()) return value;
+      }
+    }
+  }
+  return `AIDA antwortete mit HTTP ${status}.`;
 }
 
 async function documentContext(opportunityId: string) {

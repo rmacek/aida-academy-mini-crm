@@ -35,7 +35,8 @@ spec:
       labels:
         {{- include "aidacrm.labels" . | nindent 8 }}
     spec:
-      automountServiceAccountToken: false
+      serviceAccountName: {{ include "aidacrm.fullname" . }}
+      automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

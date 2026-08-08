@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const version = "1.0.3";
+const version = "1.0.4";
 const chartRoot = new URL("../deploy/olares/aidacrm/", import.meta.url);
 
 test("all app and Olares package version surfaces are aligned", async () => {

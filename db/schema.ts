@@ -169,3 +169,25 @@ SET action_instructions = replace(
 WHERE action_instructions LIKE E'%\\nAim\\n%'
    OR action_instructions LIKE E'%\\nTasks\\n%';
 `;
+
+export const migrationFour = `
+UPDATE assistant_definitions
+SET uses_product_knowledge = CASE assistant_key
+      WHEN 'offer-author' THEN true
+      WHEN 'feasibility-analyst' THEN true
+      WHEN 'implementation-handout' THEN true
+      WHEN 'aida-gap-analyst' THEN true
+      ELSE false
+    END,
+    updated_at = now()
+WHERE assistant_key IN (
+  'sales-copilot', 'meeting-briefing', 'email-drafter', 'risk-analyst',
+  'offer-author', 'feasibility-analyst', 'implementation-handout', 'aida-gap-analyst'
+);
+
+UPDATE assistant_definitions
+SET action_instructions = action_instructions || E'\\n- Support every AIDA product capability claim with approved AIDA product knowledge. If the knowledge base does not support a claim, label it NOT DOCUMENTED instead of guessing.',
+    updated_at = now()
+WHERE assistant_key IN ('offer-author', 'feasibility-analyst', 'implementation-handout', 'aida-gap-analyst')
+  AND action_instructions NOT LIKE '%label it NOT DOCUMENTED%';
+`;
