@@ -4,7 +4,7 @@ workloads:
 
 image:
   repository: ghcr.io/rmacek/aida-academy-mini-crm
-  tag: 1.0.6
+  tag: 1.0.7
   pullPolicy: IfNotPresent
 
 olaresEnv:
@@ -20,6 +20,3 @@ olaresEnv:
 
 database:
   maximumPoolSize: 5
-
-userspace:
-  appData: /tmp/aidacrm-appdata

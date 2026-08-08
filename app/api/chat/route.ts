@@ -187,14 +187,14 @@ function aidaErrorMessage(payload: unknown, status: number) {
 }
 
 async function documentContext(opportunityId: string) {
-  const result = await query<{ name: string; mediaType: string; storageKey: string }>(
-    `SELECT name,media_type AS "mediaType",storage_key AS "storageKey"
+  const result = await query<{ name: string; mediaType: string; content: Buffer }>(
+    `SELECT name,media_type AS "mediaType",content
      FROM documents WHERE opportunity_id=$1 ORDER BY created_at DESC LIMIT 10`, [opportunityId]);
   const context: Array<{ name: string; mediaType: string; content: string }> = [];
   let remainingCharacters = 60_000;
   for (const item of result.rows) {
     if (remainingCharacters <= 0) break;
-    const extracted = await readTextDocumentContext(item.storageKey, item.mediaType).catch(() => "");
+    const extracted = await readTextDocumentContext(item.content, item.mediaType).catch(() => "");
     const content = extracted.slice(0, Math.min(12_000, remainingCharacters));
     if (!content) continue;
     context.push({ name: item.name, mediaType: item.mediaType, content });

@@ -64,8 +64,6 @@ spec:
               value: {{ .Values.olaresEnv.CRM_BOOTSTRAP_ADMIN_USERNAME | quote }}
             - name: CRM_SEED_SAMPLE_DATA
               value: {{ .Values.olaresEnv.CRM_SEED_SAMPLE_DATA | quote }}
-            - name: CRM_DOCUMENT_ROOT
-              value: /data/documents
             - name: CRM_POSTGRES_MAX_POOL_SIZE
               value: {{ .Values.database.maximumPoolSize | quote }}
             - name: AIDA_API_BASE_URL
@@ -104,15 +102,9 @@ spec:
               drop:
                 - ALL
           volumeMounts:
-            - name: documents
-              mountPath: /data/documents
             - name: temporary
               mountPath: /tmp
       volumes:
-        - name: documents
-          hostPath:
-            path: {{ printf "%s/documents" .Values.userspace.appData | quote }}
-            type: DirectoryOrCreate
         - name: temporary
           emptyDir:
             sizeLimit: 256Mi

@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS documents (
   size_bytes bigint NOT NULL CHECK (size_bytes BETWEEN 1 AND 5242880),
   storage_key varchar(240) NOT NULL UNIQUE,
   checksum_sha256 char(64) NOT NULL,
+  content bytea NOT NULL,
   created_by uuid NOT NULL REFERENCES users(id),
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -190,4 +191,10 @@ SET action_instructions = action_instructions || E'\\n- Support every AIDA produ
     updated_at = now()
 WHERE assistant_key IN ('offer-author', 'feasibility-analyst', 'implementation-handout', 'aida-gap-analyst')
   AND action_instructions NOT LIKE '%label it NOT DOCUMENTED%';
+`;
+
+export const migrationFive = `
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS content bytea;
+UPDATE documents SET content = decode('', 'hex') WHERE content IS NULL;
+ALTER TABLE documents ALTER COLUMN content SET NOT NULL;
 `;

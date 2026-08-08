@@ -70,7 +70,6 @@ synthetische Verkaufschancen für den Isolationstest.
 | `CRM_TENANT_NAME` | Sichtbarer Name des gemeinsamen CRM-Arbeitsbereichs |
 | `CRM_BOOTSTRAP_ADMIN_USERNAME` | Erster CRM-Administrator bei leerer Datenbank |
 | `CRM_BOOTSTRAP_ADMIN_PASSWORD` | Initialpasswort; Wechsel bei erster Anmeldung |
-| `CRM_DOCUMENT_ROOT` | Privates AppData-Verzeichnis für Dokumente |
 | `AIDA_API_BASE_URL` | HTTPS-Adresse der AIDA-Instanz |
 | `AIDA_SERVICE_TOKEN` | Tenantgebundener Service-Account-Token |
 | `AIDA_MODEL_PROFILE_NAME` | Kostenoptimiertes Standard-Modellprofil |

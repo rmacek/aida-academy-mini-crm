@@ -1,7 +1,7 @@
 import { currentApiUser, forbidden, requireSameOrigin, unauthorized } from "../../api-user";
 import { query } from "../../../db";
 import { canAccessOpportunity, canWrite } from "../../../db/repository";
-import { DocumentValidationError, removeStoredDocument, saveDocument } from "../../../lib/documents";
+import { DocumentValidationError, saveDocument } from "../../../lib/documents";
 
 export async function POST(request: Request) {
   if (!(await requireSameOrigin(request))) return Response.json({ error: "invalid_origin" }, { status: 403 });
@@ -17,17 +17,13 @@ export async function POST(request: Request) {
   }
   try {
     const saved = await saveDocument(file);
-    try {
-      await query(
-        `INSERT INTO documents(id,opportunity_id,name,media_type,size_bytes,storage_key,checksum_sha256,created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [saved.id, opportunityId, saved.name, saved.mediaType, saved.size, saved.storageKey, saved.checksum, user.userId]);
-      await query(`INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,outcome)
-        VALUES ($1,'document.upload','document',$2,'succeeded')`, [user.userId, saved.id]);
-    } catch (error) {
-      await removeStoredDocument(saved.storageKey);
-      throw error;
-    }
+    await query(
+      `INSERT INTO documents(id,opportunity_id,name,media_type,size_bytes,storage_key,checksum_sha256,content,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [saved.id, opportunityId, saved.name, saved.mediaType, saved.size, saved.storageKey,
+        saved.checksum, saved.content, user.userId]);
+    await query(`INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,outcome)
+      VALUES ($1,'document.upload','document',$2,'succeeded')`, [user.userId, saved.id]);
     return Response.json({ ok: true, id: saved.id });
   } catch (error) {
     if (error instanceof DocumentValidationError) {

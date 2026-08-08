@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { runtimeEnv } from "../db/repository";
 
 export async function saveDocument(file: File) {
   if (file.size < 1 || file.size > 5 * 1024 * 1024 || file.name.length > 180) {
@@ -19,9 +17,6 @@ export async function saveDocument(file: File) {
   const id = crypto.randomUUID();
   const extension = mediaType === "application/pdf" ? ".pdf" : mediaType === "text/markdown" ? ".md" : ".txt";
   const storageKey = `${id}${extension}`;
-  const destination = containedDocumentPath(storageKey);
-  await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
-  await writeFile(destination, bytes, { flag: "wx", mode: 0o600 });
   return {
     id,
     name: safeFileName(file.name),
@@ -29,6 +24,7 @@ export async function saveDocument(file: File) {
     size: bytes.length,
     storageKey,
     checksum: createHash("sha256").update(bytes).digest("hex"),
+    content: bytes,
   };
 }
 
@@ -46,16 +42,7 @@ function allowedMediaType(file: File) {
   return declared === inferred ? inferred : null;
 }
 
-export async function readDocument(storageKey: string) {
-  return readFile(containedDocumentPath(storageKey));
-}
-
-export async function removeStoredDocument(storageKey: string) {
-  try { await unlink(containedDocumentPath(storageKey)); } catch { /* DB remains authoritative */ }
-}
-
-export async function readTextDocumentContext(storageKey: string, mediaType: string) {
-  const bytes = await readDocument(storageKey);
+export async function readTextDocumentContext(bytes: Buffer, mediaType: string) {
   const text = mediaType === "application/pdf"
     ? await extractPdfText(bytes)
     : bytes.toString("utf8").replace(/\0/g, "").trim();
@@ -71,14 +58,6 @@ async function extractPdfText(bytes: Buffer) {
   } finally {
     await parser.destroy();
   }
-}
-
-function containedDocumentPath(storageKey: string) {
-  if (!/^[0-9a-f-]{36}\.(txt|md|pdf)$/.test(storageKey)) throw new Error("Invalid storage key.");
-  const root = path.resolve(runtimeEnv().CRM_DOCUMENT_ROOT);
-  const candidate = path.resolve(root, storageKey);
-  if (!candidate.startsWith(`${root}${path.sep}`)) throw new Error("Document path escaped its root.");
-  return candidate;
 }
 
 function safeFileName(value: string) {

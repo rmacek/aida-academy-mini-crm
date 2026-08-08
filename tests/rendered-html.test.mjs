@@ -83,10 +83,12 @@ test("packages an independently installable PostgreSQL-backed Marketplace app", 
   assert.match(deployment, /automountServiceAccountToken: true/);
   assert.match(serviceAccount, /kind: ServiceAccount/);
   assert.doesNotMatch(serviceAccount, /kind: (Role|RoleBinding|ClusterRole)/);
+  assert.doesNotMatch(deployment, /runAsUser: 0|hostPath:|CRM_DOCUMENT_ROOT/);
   assert.match(deployment, /runAsNonRoot: true/);
   assert.match(runtimeSecret, /CRM_POSTGRES_HOST/);
   assert.match(values, /repository: ghcr\.io\/rmacek\/aida-academy-mini-crm/);
   assert.match(schema, /kind varchar\(60\) NOT NULL/);
+  assert.match(schema, /content bytea NOT NULL/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS assistant_definitions/);
   assert.match(nextConfig, /Content-Security-Policy/);
   assert.match(exampleEnv, /CRM_BOOTSTRAP_ADMIN_PASSWORD=iqx4academy2026\./);

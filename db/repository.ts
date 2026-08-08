@@ -107,7 +107,6 @@ export function runtimeEnv() {
     AIDA_SERVICE_TOKEN: process.env.AIDA_SERVICE_TOKEN?.trim(),
     AIDA_MODEL_PROFILE_NAME: process.env.AIDA_MODEL_PROFILE_NAME?.trim(),
     AIDA_PRODUCT_KNOWLEDGE_BASE_ID: process.env.AIDA_PRODUCT_KNOWLEDGE_BASE_ID?.trim(),
-    CRM_DOCUMENT_ROOT: process.env.CRM_DOCUMENT_ROOT?.trim() || "/data/documents",
     CRM_TENANT_NAME: process.env.CRM_TENANT_NAME?.trim() || "CRM-Tenant",
   };
 }
