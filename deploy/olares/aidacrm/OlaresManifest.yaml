@@ -10,7 +10,7 @@ metadata:
   title: AIDA CRM
   description: Mehrbenutzerfähiges CRM für Verkaufschancen mit kontextisolierten AIDA-Assistenten.
   icon: https://raw.githubusercontent.com/rmacek/aida-academy-mini-crm/main/public/market-icon.webp
-  version: '1.0.14'
+  version: '1.0.15'
   categories:
     - Productivity_v112
 
@@ -24,7 +24,7 @@ entrances:
     openMethod: window
 
 spec:
-  versionName: '1.0.14'
+  versionName: '1.0.15'
   apiTimeout: 0
   fullDescription: |
     AIDA CRM verwaltet Verkaufschancen, Kunden-UseCases, Termine, Aufgaben,

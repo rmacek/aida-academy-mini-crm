@@ -180,6 +180,9 @@ export async function POST(request: Request) {
     requestedConversationId: conversation.aidaConversationId ? null : expectedAidaConversationId,
     runContextMode: null,
     cloudProcessingConfirmed: false,
+    knowledgeSearchQuery: assistant.usesProductKnowledge
+      ? buildKnowledgeSearchQuery(opportunityContext, prompt)
+      : null,
   };
   const response = await fetch(new URL("/api/v1/chat/jobs", configuration.baseUrl), {
     method: "POST",
@@ -584,4 +587,14 @@ MANDATORY CRM SECURITY BOUNDARY
     ? rawContext
     : `${rawContext.slice(0, Math.max(0, contextBudget - 52))}\n[CONTEXT TRUNCATED TO THE SAFE REQUEST LIMIT]`;
   return `${prefix}${context}${suffix}`;
+}
+
+function buildKnowledgeSearchQuery(
+  opportunity: { customerUseCase: string },
+  task: string,
+) {
+  const normalized = `AIDA-Funktionen für den UseCase: ${opportunity.customerUseCase}. Aufgabe: ${task}`
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized.slice(0, 300);
 }

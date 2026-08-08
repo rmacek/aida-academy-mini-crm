@@ -94,6 +94,9 @@ if (capturePath) {
   assert.match(capture.body.prompt, /NORDSTERN-KONTEXT-101/);
   assert.doesNotMatch(capture.body.prompt, /PROJEKT-SONNENWENDE-42/);
   assert.ok(capture.body.prompt.length <= 16_000);
+  assert.match(capture.body.knowledgeSearchQuery, /AIDA-Funktionen für den UseCase/);
+  assert.doesNotMatch(capture.body.knowledgeSearchQuery, /PROJEKT-SONNENWENDE-42/);
+  assert.ok(capture.body.knowledgeSearchQuery.length <= 300);
 }
 
 process.stdout.write("runtime-e2e-passed\n");
