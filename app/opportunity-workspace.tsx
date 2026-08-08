@@ -290,7 +290,10 @@ function Copilot({ opportunity, assistants, conversations, conversation, message
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-envoy-upstream-rq-timeout-ms": "180000",
+        },
         body: JSON.stringify({ opportunityId: opportunity.id, conversationId: conversation.id,
           prompt, assistantKey: selectedAssistant.key }),
       });

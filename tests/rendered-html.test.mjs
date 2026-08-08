@@ -58,6 +58,7 @@ test("loads CRM assistants dynamically and keeps the AIDA token server-side", as
   assert.match(chat, /return url\.protocol === "https:"/);
   assert.doesNotMatch(chat, /svc\.cluster\.local|url\.port === "80"/);
   assert.match(workspace, /response\.body\.getReader\(\)/);
+  assert.match(workspace, /"x-envoy-upstream-rq-timeout-ms": "180000"/);
   assert.match(database, /return `ACTION\n/);
   for (const heading of ["Act", "Context", "Task", "Instructions", "Output", "Narrowing"]) {
     assert.match(database, new RegExp(`\\n${heading}\\n`));

@@ -84,6 +84,9 @@ akzeptiert AIDA-Ziele ausschließlich per HTTPS. `spec.apiTimeout: 0` im
 Olares-Manifest erlaubt lange lokale Modellläufe ohne das standardmäßige
 15-Sekunden-Zeitlimit. Die versionierte NDJSON-API von AIDA und der
 Antwortstrom des CRM senden zusätzlich regelmäßig Heartbeats.
+Der Browseraufruf übermittelt den gleichen 180-Sekunden-Rahmen explizit an
+den Envoy-Sidecar, damit der letzte interne Proxy-Hop das Manifest-Limit nicht
+auf seinen Standardwert zurücksetzt.
 
 ## Kontrollierte Veröffentlichung
 
