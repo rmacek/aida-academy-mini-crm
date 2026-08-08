@@ -10,7 +10,7 @@ metadata:
   title: AIDA CRM
   description: Mehrbenutzerfähiges CRM für Verkaufschancen mit kontextisolierten AIDA-Assistenten.
   icon: https://raw.githubusercontent.com/rmacek/aida-academy-mini-crm/main/public/market-icon.webp
-  version: '1.0.5'
+  version: '1.0.6'
   categories:
     - Productivity_v112
 
@@ -24,7 +24,7 @@ entrances:
     openMethod: window
 
 spec:
-  versionName: '1.0.5'
+  versionName: '1.0.6'
   fullDescription: |
     AIDA CRM verwaltet Verkaufschancen, Kunden-UseCases, Termine, Aufgaben,
     Notizen, Dokumente, Unterhaltungen und KI-Artefakte. Vorkonfigurierte,
@@ -34,8 +34,8 @@ spec:
     berechtigten CRM-Benutzer der Installation arbeiten in demselben
     Unternehmenskontext; andere Installationen bleiben getrennt.
   upgradeDescription: |
-    Korrigiert den Olares-Gateway-Start und den Markdown-Upload, richtet das
-    lokale Modellprofil aus und trennt produktwissensabhängige Assistenten.
+    Korrigiert Gateway-Start, Markdown-Upload und Image-Wechsel bei Upgrades;
+    richtet das Modellprofil aus und trennt produktwissensabhängige Assistenten.
   developer: Ronald Macek
   website: https://github.com/rmacek/aida-academy-mini-crm
   sourceCode: https://github.com/rmacek/aida-academy-mini-crm

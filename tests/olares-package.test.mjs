@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const version = "1.0.5";
+const version = "1.0.6";
 const chartRoot = new URL("../deploy/olares/aidacrm/", import.meta.url);
 
 test("all app and Olares package version surfaces are aligned", async () => {
@@ -31,6 +31,6 @@ test("Marketplace scanners can resolve the immutable runtime image", async () =>
   assert.match(values, new RegExp(`^  tag: ${version.replaceAll(".", "\\.")}$`, "m"));
   assert.match(
     deployment,
-    /image: "\{\{ \.Values\.image\.repository \}\}:\{\{ \.Values\.image\.tag \}\}"/,
+    /image: "\{\{ \.Values\.image\.repository \}\}:\{\{ \.Chart\.AppVersion \}\}"/,
   );
 });
