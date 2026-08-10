@@ -454,7 +454,7 @@ assert.ok(manifestContent.includes('allowMultipleInstall')); // AC-04
 // PostgreSQL middleware test
 assert.ok(repositoryContent.includes('query')); // AC-04
 
-test('cloud processing consent defaults false and is enforced by admin and chat APIs', async () => {
+test('cloud consent defaults false, remains admin-controlled, and is delegated to AIDA policy', async () => {
   const [adminAssistantsContent, chatRouteContent] = await Promise.all([
     readFile(new URL('app/api/admin/assistants/route.ts', repositoryRoot), 'utf8'),
     readFile(new URL('app/api/chat/route.ts', repositoryRoot), 'utf8'),
@@ -489,6 +489,11 @@ test('cloud processing consent defaults false and is enforced by admin and chat 
     chatRouteContent,
     /cloudProcessingConfirmed\s*:\s*[A-Za-z_$][\w$]*\.cloudProcessingConfirmed\b/,
     'chat dispatch must use the exact stored assistant consent Boolean',
+  );
+  assert.doesNotMatch(
+    chatRouteContent,
+    /if\s*\(\s*assistant\.cloudProcessingConfirmed\s*!==\s*true\s*\)/,
+    'the CRM must not reject consent=false before AIDA can select an approved local route',
   );
 });
 

@@ -91,9 +91,6 @@ export async function POST(request: Request) {
      FROM assistant_definitions WHERE assistant_key=$1 AND active`, [assistantKey]);
   const assistant = assistantResult.rows[0];
   if (!assistant) return Response.json({ error: "assistant_not_found" }, { status: 404 });
-  if (assistant.cloudProcessingConfirmed !== true) {
-    return Response.json({ error: "cloud_processing_consent_required" }, { status: 403 });
-  }
 
   const configuration = aidaConfiguration(assistant.usesProductKnowledge);
   if (configuration instanceof Response) return configuration;
@@ -184,7 +181,7 @@ export async function POST(request: Request) {
     conversationId: conversation.aidaConversationId,
     requestedConversationId: conversation.aidaConversationId ? null : expectedAidaConversationId,
     runContextMode: null,
-    cloudProcessingConfirmed: assistant.cloudProcessingConfirmed === true,
+    cloudProcessingConfirmed: assistant.cloudProcessingConfirmed,
     knowledgeSearchQuery: assistant.usesProductKnowledge
       ? buildKnowledgeSearchQuery(opportunityContext, prompt)
       : null,

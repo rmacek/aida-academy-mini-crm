@@ -45,7 +45,8 @@ test("loads CRM assistants dynamically and keeps the AIDA token server-side", as
   assert.match(chat, /Work exclusively with the ACTIVE OPPORTUNITY BOUNDARY and SNAPSHOT/);
   assert.match(chat, /AssistantRow[\s\S]*cloudProcessingConfirmed: boolean/);
   assert.match(chat, /cloud_processing_confirmed AS "cloudProcessingConfirmed"/);
-  assert.match(chat, /cloudProcessingConfirmed: assistant\.cloudProcessingConfirmed === true/);
+  assert.match(chat, /cloudProcessingConfirmed: assistant\.cloudProcessingConfirmed/);
+  assert.doesNotMatch(chat, /cloudProcessingConfirmed: assistant\.cloudProcessingConfirmed === true/);
   assert.doesNotMatch(chat, /cloudProcessingConfirmed:\s*[^,\n]*assistantKey/);
   assert.doesNotMatch(chat, /cloudProcessingConfirmed:\s*[^,\n]*modelProfileName/);
   assert.doesNotMatch(chat, /cloudProcessingConfirmed:\s*[^,\n]*body(?:\.|\[)/);

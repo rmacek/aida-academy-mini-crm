@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const version = "1.0.21";
+const version = "1.0.22";
 const chartRoot = new URL("../deploy/olares/aidacrm/", import.meta.url);
 
 const [app, serviceAccount, networkPolicy, runtimeSecret, manifest, chart, values, helpers] =
@@ -294,7 +294,7 @@ test("each installation uses a dedicated non-distributed PostgreSQL database", (
   assert.equal(/^  allowMultipleInstall: true$/m.test(manifest), true, "Multiple installation contract");
 });
 
-test("deployment version surfaces are aligned to 1.0.21", () => {
+test("deployment version surfaces are aligned to 1.0.22", () => {
   const escapedVersion = version.replaceAll(".", "\\.");
 
   assert.equal(new RegExp(`^version: ${escapedVersion}$`, "m").test(chart), true, "Chart version contract");
