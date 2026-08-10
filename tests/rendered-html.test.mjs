@@ -95,9 +95,9 @@ test("packages an independently installable PostgreSQL-backed Marketplace app", 
   assert.match(manifest, /middleware:\n  postgres:/);
   assert.match(manifest, /AIDA_SERVICE_TOKEN/);
   assert.match(deployment, /serviceAccountName: \{\{ include "aidacrm\.fullname" \. \}\}/);
-  assert.match(deployment, /automountServiceAccountToken: false/);
+  assert.match(deployment, /automountServiceAccountToken: true/);
   assert.match(serviceAccount, /kind: ServiceAccount/);
-  assert.match(serviceAccount, /automountServiceAccountToken: false/);
+  assert.match(serviceAccount, /automountServiceAccountToken: true/);
   assert.doesNotMatch(serviceAccount, /kind: (Role|RoleBinding|ClusterRole)/);
   assert.doesNotMatch(deployment, /runAsUser: 0|hostPath:|CRM_DOCUMENT_ROOT/);
   assert.match(deployment, /runAsNonRoot: true/);

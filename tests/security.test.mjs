@@ -1,11 +1,12 @@
 import { strictEqual } from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = new URL('..', new URL('.', import.meta.url));
 
 async function readSource(path) {
-  const fullPath = new URL(path, repositoryRoot).pathname;
+  const fullPath = fileURLToPath(new URL(path, repositoryRoot));
   return await readFile(fullPath, 'utf8');
 }
 

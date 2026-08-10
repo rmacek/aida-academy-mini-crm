@@ -37,7 +37,9 @@ spec:
         {{- include "aidacrm.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "aidacrm.fullname" . }}
-      automountServiceAccountToken: false
+      # Olares injects initialization and Envoy sidecars that require the
+      # workload identity token during pod bootstrap.
+      automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

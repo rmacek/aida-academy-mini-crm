@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const version = "1.0.19";
+const version = "1.0.20";
 const chartRoot = new URL("../deploy/olares/aidacrm/", import.meta.url);
 
 const [app, serviceAccount, networkPolicy, runtimeSecret, manifest, chart, values, helpers] =
@@ -56,14 +56,14 @@ function runtimeSecretStringDataEntries() {
     });
 }
 
-test("pod and ServiceAccount disable API token automount", () => {
+test("pod and ServiceAccount expose workload identity for Olares platform sidecars", () => {
   assert.equal(
-    /serviceAccountName: \{\{ include "aidacrm\.fullname" \. \}\}\n      automountServiceAccountToken: false/.test(app),
+    /serviceAccountName: \{\{ include "aidacrm\.fullname" \. \}\}[\s\S]*automountServiceAccountToken: true/.test(app),
     true,
     "Pod service account token automount contract",
   );
   assert.equal(
-    /^kind: ServiceAccount[\s\S]*^automountServiceAccountToken: false$/m.test(serviceAccount),
+    /^kind: ServiceAccount[\s\S]*^automountServiceAccountToken: true$/m.test(serviceAccount),
     true,
     "ServiceAccount token automount contract",
   );
@@ -294,7 +294,7 @@ test("each installation uses a dedicated non-distributed PostgreSQL database", (
   assert.equal(/^  allowMultipleInstall: true$/m.test(manifest), true, "Multiple installation contract");
 });
 
-test("deployment version surfaces are aligned to 1.0.19", () => {
+test("deployment version surfaces are aligned to 1.0.20", () => {
   const escapedVersion = version.replaceAll(".", "\\.");
 
   assert.equal(new RegExp(`^version: ${escapedVersion}$`, "m").test(chart), true, "Chart version contract");
