@@ -240,3 +240,11 @@ CREATE INDEX IF NOT EXISTS chat_dispatches_retention
   ON chat_dispatches(completed_at)
   WHERE completed_at IS NOT NULL;
 `;
+
+// Migration 4 originally introduced this field. Keep historical migrations
+// immutable and repair installations that recorded version 4 before the
+// column was part of that migration.
+export const migrationSeven = `
+ALTER TABLE assistant_definitions
+  ADD COLUMN IF NOT EXISTS cloud_processing_confirmed BOOLEAN NOT NULL DEFAULT false;
+`;

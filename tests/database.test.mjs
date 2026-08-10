@@ -321,6 +321,89 @@ const schemaContent = await readFile(schemaFile, 'utf8');
 const repositoryContent = await readFile(repositoryFile, 'utf8');
 const manifestContent = await readFile(manifestFile, 'utf8');
 
+test(
+  'migration seven repairs an installation that recorded migration four before the consent column existed',
+  {
+    skip: process.env.DATABASE_URL
+      ? false
+      : 'DATABASE_URL is not set; PostgreSQL upgrade test skipped',
+  },
+  async () => {
+    const databaseUrl = process.env.DATABASE_URL;
+    const databaseName = decodeURIComponent(new URL(databaseUrl).pathname.replace(/^\/+/, ''));
+    if (!/(?:^|[-_])(?:test|validation|ci)(?:$|[-_])/i.test(databaseName)) {
+      throw new Error(
+        'Refusing to run PostgreSQL upgrade test: decoded database name must match /test|validation|ci/i',
+      );
+    }
+
+    const migrationMatch = schemaContent.match(
+      /export const migrationSeven = `([\s\S]*?)`;/,
+    );
+    assert.ok(migrationMatch, 'migration seven SQL must be exported');
+
+    const pg = await import('pg');
+    const client = new pg.default.Client({
+      connectionString: databaseUrl,
+      connectionTimeoutMillis: 5000,
+      query_timeout: 5000,
+    });
+    const schemaName = `migration_seven_${process.pid}_${Date.now()}`;
+    assert.match(schemaName, /^[a-z_][a-z0-9_]*$/);
+
+    await client.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`CREATE SCHEMA ${schemaName}`);
+      await client.query(`SET LOCAL search_path TO ${schemaName}`);
+      await client.query(`
+        CREATE TABLE assistant_definitions (
+          key varchar(60) PRIMARY KEY,
+          display_name varchar(120) NOT NULL
+        )
+      `);
+      await client.query(`
+        CREATE TABLE schema_migrations (
+          version integer PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      await client.query('INSERT INTO schema_migrations(version) SELECT generate_series(1, 6)');
+
+      const before = await client.query(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND table_name = 'assistant_definitions'
+          AND column_name = 'cloud_processing_confirmed'
+      `, [schemaName]);
+      assert.equal(before.rowCount, 0, 'the simulated legacy installation must lack the column');
+
+      await client.query(migrationMatch[1]);
+      await client.query('INSERT INTO schema_migrations(version) VALUES (7)');
+
+      const after = await client.query(`
+        SELECT is_nullable, column_default
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND table_name = 'assistant_definitions'
+          AND column_name = 'cloud_processing_confirmed'
+      `, [schemaName]);
+      assert.equal(after.rowCount, 1);
+      assert.equal(after.rows[0].is_nullable, 'NO');
+      assert.match(after.rows[0].column_default, /false/i);
+
+      const versions = await client.query(
+        'SELECT version FROM schema_migrations ORDER BY version',
+      );
+      assert.deepEqual(versions.rows.map(row => row.version), [1, 2, 3, 4, 5, 6, 7]);
+    } finally {
+      await client.query('ROLLBACK').catch(() => {});
+      await client.end();
+    }
+  },
+);
+
 // Existing database and repository source-contract assertions
 
 // Migration One Test
@@ -340,6 +423,7 @@ assert.ok(schemaContent.includes('migrationFive')); // AC-04
 
 // Migration Six Test
 assert.ok(schemaContent.includes('migrationSix')); // AC-04
+assert.ok(schemaContent.includes('migrationSeven')); // upgrade compatibility
 
 // Core Tables Test
 assert.ok(schemaContent.includes('opportunities')); // AC-04

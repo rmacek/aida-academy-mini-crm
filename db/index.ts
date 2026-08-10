@@ -1,7 +1,13 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { hashPassword } from "../lib/passwords";
 import {
-  migrationFive, migrationFour, migrationOne, migrationSix, migrationThree, migrationTwo,
+  migrationFive,
+  migrationFour,
+  migrationOne,
+  migrationSeven,
+  migrationSix,
+  migrationThree,
+  migrationTwo,
 } from "./schema";
 
 declare global {
@@ -71,7 +77,7 @@ async function migrateAndBootstrap() {
     await client.query("CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
     const migrations = [
       [1, migrationOne], [2, migrationTwo], [3, migrationThree], [4, migrationFour],
-      [5, migrationFive], [6, migrationSix],
+      [5, migrationFive], [6, migrationSix], [7, migrationSeven],
     ] as const;
     for (const [version, sql] of migrations) {
       const current = await client.query<{ version: number }>(
