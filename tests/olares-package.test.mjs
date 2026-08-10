@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const version = "1.0.15";
+const version = "1.0.19";
 const chartRoot = new URL("../deploy/olares/aidacrm/", import.meta.url);
 
 test("all app and Olares package version surfaces are aligned", async () => {
@@ -24,17 +24,41 @@ test("all app and Olares package version surfaces are aligned", async () => {
 });
 
 test("Marketplace scanners can resolve the immutable runtime image", async () => {
-  const [values, deployment] = await Promise.all([
+  const [values, chart, deployment, workflow] = await Promise.all([
     readFile(new URL("values.yaml", chartRoot), "utf8"),
+    readFile(new URL("Chart.yaml", chartRoot), "utf8"),
     readFile(new URL("templates/app.yaml", chartRoot), "utf8"),
+    readFile(new URL("../.github/workflows/deliver.yml", import.meta.url), "utf8"),
   ]);
 
   assert.match(values, /^  repository: ghcr\.io\/rmacek\/aida-academy-mini-crm$/m);
   assert.match(values, new RegExp(`^  tag: ${version.replaceAll(".", "\\.")}$`, "m"));
   assert.match(
-    deployment,
-    /image: "\{\{ \.Values\.image\.repository \}\}:\{\{ \.Chart\.AppVersion \}\}"/,
+    chart,
+    /^  aida\.iqxgroup\.io\/image-repository: ghcr\.io\/rmacek\/aida-academy-mini-crm$/m,
   );
+  assert.match(
+    deployment,
+    /required "[^"\n]+" \(index \.Chart\.Annotations "aida\.iqxgroup\.io\/image-repository"\)/,
+  );
+  assert.match(
+    deployment,
+    /image: "\{\{ \$imageRepository \}\}:\{\{ \.Chart\.AppVersion \}\}"/,
+  );
+  assert.doesNotMatch(
+    deployment,
+    /image:\s*"[^"\n]*\.Values\.image\.repository[^"\n]*"/,
+  );
+
+  const chartAnnotationRewrite =
+    'sed -i "s|^  aida\\.iqxgroup\\.io/image-repository: .*|  aida.iqxgroup.io/image-repository: $image_repository|" deploy/olares/aidacrm/Chart.yaml';
+  const helmPackage = "helm package deploy/olares/aidacrm --destination delivery";
+  const chartAnnotationRewriteIndex = workflow.indexOf(chartAnnotationRewrite);
+  const helmPackageIndex = workflow.indexOf(helmPackage);
+
+  assert.notEqual(chartAnnotationRewriteIndex, -1);
+  assert.notEqual(helmPackageIndex, -1);
+  assert.ok(chartAnnotationRewriteIndex < helmPackageIndex);
 });
 
 test("allows asynchronous HTTPS AIDA jobs and database egress only", async () => {

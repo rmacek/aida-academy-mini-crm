@@ -43,7 +43,12 @@ test("loads CRM assistants dynamically and keeps the AIDA token server-side", as
   assert.match(workspace, /KI-Arbeitsbereich/);
   assert.match(chat, /FROM assistant_definitions WHERE assistant_key=\$1 AND active/);
   assert.match(chat, /Work exclusively with the ACTIVE OPPORTUNITY BOUNDARY and SNAPSHOT/);
-  assert.match(chat, /cloudProcessingConfirmed: false/);
+  assert.match(chat, /AssistantRow[\s\S]*cloudProcessingConfirmed: boolean/);
+  assert.match(chat, /cloud_processing_confirmed AS "cloudProcessingConfirmed"/);
+  assert.match(chat, /cloudProcessingConfirmed: assistant\.cloudProcessingConfirmed === true/);
+  assert.doesNotMatch(chat, /cloudProcessingConfirmed:\s*[^,\n]*assistantKey/);
+  assert.doesNotMatch(chat, /cloudProcessingConfirmed:\s*[^,\n]*modelProfileName/);
+  assert.doesNotMatch(chat, /cloudProcessingConfirmed:\s*[^,\n]*body(?:\.|\[)/);
   assert.match(database, /function assistantActionPrompt/);
   assert.match(database, /definition\[7\]/);
   assert.match(schema, /WHEN 'offer-author' THEN true/);
@@ -90,8 +95,9 @@ test("packages an independently installable PostgreSQL-backed Marketplace app", 
   assert.match(manifest, /middleware:\n  postgres:/);
   assert.match(manifest, /AIDA_SERVICE_TOKEN/);
   assert.match(deployment, /serviceAccountName: \{\{ include "aidacrm\.fullname" \. \}\}/);
-  assert.match(deployment, /automountServiceAccountToken: true/);
+  assert.match(deployment, /automountServiceAccountToken: false/);
   assert.match(serviceAccount, /kind: ServiceAccount/);
+  assert.match(serviceAccount, /automountServiceAccountToken: false/);
   assert.doesNotMatch(serviceAccount, /kind: (Role|RoleBinding|ClusterRole)/);
   assert.doesNotMatch(deployment, /runAsUser: 0|hostPath:|CRM_DOCUMENT_ROOT/);
   assert.match(deployment, /runAsNonRoot: true/);

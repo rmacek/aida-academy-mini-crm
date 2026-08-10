@@ -10,6 +10,8 @@ type Input = {
   outputLabel?: string | null;
   createsArtifact?: boolean;
   usesProductKnowledge?: boolean;
+  cloudProcessingConfirmed?: boolean;
+  // A model profile must never be treated as cloud-processing consent.
   modelProfileName?: string | null;
   active?: boolean;
 };
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
   if (!(await requireSameOrigin(request))) return Response.json({ error: "invalid_origin" }, { status: 403 });
   const actor = await currentApiUser();
   if (!actor) return unauthorized();
-  if (actor.role !== "admin" || actor.mustChangePassword) return forbidden();
+  if (!canManageAssistants(actor) || actor.mustChangePassword) return forbidden();
   const input = await request.json().catch(() => ({})) as Input;
   const key = validKey(input.key);
   const displayName = validText(input.displayName, 2, 120);
@@ -27,9 +29,12 @@ export async function POST(request: Request) {
   const actionInstructions = validActionPrompt(input.actionInstructions);
   const outputLabel = optionalText(input.outputLabel, 180);
   const modelProfileName = optionalText(input.modelProfileName, 180);
+  const cloudProcessingConfirmed = input.cloudProcessingConfirmed === undefined
+    ? false
+    : input.cloudProcessingConfirmed;
   if (!key || !displayName || !description || !starterPrompt || !actionInstructions
       || typeof input.createsArtifact !== "boolean" || typeof input.usesProductKnowledge !== "boolean"
-      || typeof input.active !== "boolean") {
+      || typeof cloudProcessingConfirmed !== "boolean" || typeof input.active !== "boolean") {
     return Response.json({ error: "validation_failed", message: "Bitte prüfen Sie alle Assistentenfelder und die ACTION-Struktur." }, { status: 400 });
   }
   const existing = await query<{ key: string }>(
@@ -39,20 +44,26 @@ export async function POST(request: Request) {
     await client.query(
       `UPDATE assistant_definitions SET display_name=$1,description=$2,starter_prompt=$3,
        action_instructions=$4,output_label=$5,creates_artifact=$6,uses_product_knowledge=$7,
-       model_profile_name=$8,active=$9,updated_at=now() WHERE assistant_key=$10`,
+       model_profile_name=$8,cloud_processing_confirmed=$9,active=$10,updated_at=now()
+       WHERE assistant_key=$11`,
       [displayName, description, starterPrompt, actionInstructions, outputLabel,
-        input.createsArtifact, input.usesProductKnowledge, modelProfileName, input.active, key],
+        input.createsArtifact, input.usesProductKnowledge, modelProfileName,
+        cloudProcessingConfirmed, input.active, key],
     );
     await client.query(
       `INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,outcome,details)
        VALUES ($1,'assistant.update','assistant',$2,'succeeded',$3::jsonb)`,
       [actor.userId, key, JSON.stringify({ active: input.active, modelProfileName,
-        createsArtifact: input.createsArtifact, usesProductKnowledge: input.usesProductKnowledge })],
+        createsArtifact: input.createsArtifact, usesProductKnowledge: input.usesProductKnowledge,
+        cloudProcessingConfirmed })],
     );
   });
   return Response.json({ ok: true });
 }
 
+function canManageAssistants(actor: { role: string }) {
+  return actor.role === "admin";
+}
 function validKey(value: unknown) {
   const text = typeof value === "string" ? value.trim() : "";
   return /^[a-z][a-z0-9-]{2,59}$/.test(text) ? text : null;

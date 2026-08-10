@@ -2,5 +2,7 @@ apiVersion: v2
 name: aidacrm
 description: Tenant-installable multi-user CRM with contextual AIDA assistants
 type: application
-version: 1.0.15
-appVersion: 1.0.15
+annotations:
+  aida.iqxgroup.io/image-repository: ghcr.io/rmacek/aida-academy-mini-crm
+version: 1.0.19
+appVersion: 1.0.19

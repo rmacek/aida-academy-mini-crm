@@ -19,6 +19,7 @@ type AssistantRow = {
   createsArtifact: boolean;
   usesProductKnowledge: boolean;
   modelProfileName: string | null;
+  cloudProcessingConfirmed: boolean;
 };
 
 type DispatchRow = {
@@ -85,10 +86,14 @@ export async function POST(request: Request) {
     `SELECT assistant_key AS key,action_instructions AS instructions,
       output_label AS "outputLabel",creates_artifact AS "createsArtifact",
       uses_product_knowledge AS "usesProductKnowledge",
-      model_profile_name AS "modelProfileName"
+      model_profile_name AS "modelProfileName",
+      cloud_processing_confirmed AS "cloudProcessingConfirmed"
      FROM assistant_definitions WHERE assistant_key=$1 AND active`, [assistantKey]);
   const assistant = assistantResult.rows[0];
   if (!assistant) return Response.json({ error: "assistant_not_found" }, { status: 404 });
+  if (assistant.cloudProcessingConfirmed !== true) {
+    return Response.json({ error: "cloud_processing_consent_required" }, { status: 403 });
+  }
 
   const configuration = aidaConfiguration(assistant.usesProductKnowledge);
   if (configuration instanceof Response) return configuration;
@@ -179,7 +184,7 @@ export async function POST(request: Request) {
     conversationId: conversation.aidaConversationId,
     requestedConversationId: conversation.aidaConversationId ? null : expectedAidaConversationId,
     runContextMode: null,
-    cloudProcessingConfirmed: false,
+    cloudProcessingConfirmed: assistant.cloudProcessingConfirmed === true,
     knowledgeSearchQuery: assistant.usesProductKnowledge
       ? buildKnowledgeSearchQuery(opportunityContext, prompt)
       : null,
@@ -224,13 +229,16 @@ export async function PATCH(request: Request) {
   }
   const user = await currentApiUser();
   if (!user) return unauthorized();
-  if (user.mustChangePassword) return forbidden();
+  if (!canWrite(user) || user.mustChangePassword) return forbidden();
   const input = await request.json().catch(() => ({})) as ChatStatusRequest;
   if (!validUuid(input.jobId)) {
     return Response.json({ error: "validation_failed" }, { status: 400 });
   }
   const dispatch = await findDispatch(input.jobId);
   if (!dispatch) return Response.json({ error: "job_not_found" }, { status: 404 });
+  if (!(await canAccessConversation(dispatch.conversationId, dispatch.opportunityId))) {
+    return forbidden();
+  }
   if (dispatch.status === "Succeeded") {
     return Response.json({ jobId: dispatch.id, status: dispatch.status });
   }

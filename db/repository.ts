@@ -98,8 +98,29 @@ export type AssistantDefinition = {
   createsArtifact: boolean;
   usesProductKnowledge: boolean;
   modelProfileName: string | null;
+  cloudProcessingConfirmed: boolean;
   active: boolean;
 };
+
+type AssistantDefinitionRow = Omit<AssistantDefinition, "cloudProcessingConfirmed"> & {
+  cloud_processing_confirmed: boolean | null;
+};
+
+function mapAssistantDefinition(row: AssistantDefinitionRow): AssistantDefinition {
+  return {
+    key: row.key,
+    displayName: row.displayName,
+    description: row.description,
+    starterPrompt: row.starterPrompt,
+    actionInstructions: row.actionInstructions,
+    outputLabel: row.outputLabel,
+    createsArtifact: row.createsArtifact,
+    usesProductKnowledge: row.usesProductKnowledge,
+    modelProfileName: row.modelProfileName,
+    cloudProcessingConfirmed: Boolean(row.cloud_processing_confirmed),
+    active: row.active,
+  };
+}
 
 export type ChatDispatch = {
   id: string;
@@ -159,20 +180,22 @@ export async function readWorkspace(user: CrmUser) {
         ? query<UserSummary>(`SELECT id, username, display_name AS "displayName", role, active
             FROM users ORDER BY lower(username)`)
         : Promise.resolve({ rows: [] as UserSummary[] }),
-      query<AssistantDefinition>(`SELECT assistant_key AS key,display_name AS "displayName",
+      query<AssistantDefinitionRow>(`SELECT assistant_key AS key,display_name AS "displayName",
         description,starter_prompt AS "starterPrompt",action_instructions AS "actionInstructions",
         output_label AS "outputLabel",creates_artifact AS "createsArtifact",
         uses_product_knowledge AS "usesProductKnowledge",
-        model_profile_name AS "modelProfileName",active
+        model_profile_name AS "modelProfileName",
+        cloud_processing_confirmed,active
         FROM assistant_definitions WHERE active ORDER BY display_name`),
       user.role === "admin"
-        ? query<AssistantDefinition>(`SELECT assistant_key AS key,display_name AS "displayName",
+        ? query<AssistantDefinitionRow>(`SELECT assistant_key AS key,display_name AS "displayName",
             description,starter_prompt AS "starterPrompt",action_instructions AS "actionInstructions",
             output_label AS "outputLabel",creates_artifact AS "createsArtifact",
             uses_product_knowledge AS "usesProductKnowledge",
-            model_profile_name AS "modelProfileName",active
+            model_profile_name AS "modelProfileName",
+            cloud_processing_confirmed,active
             FROM assistant_definitions ORDER BY display_name`)
-        : Promise.resolve({ rows: [] as AssistantDefinition[] }),
+        : Promise.resolve({ rows: [] as AssistantDefinitionRow[] }),
     ]);
   return {
     tenant: runtimeEnv().CRM_TENANT_NAME,
@@ -190,8 +213,8 @@ export async function readWorkspace(user: CrmUser) {
     artifacts: artifacts.rows,
     chatDispatches: chatDispatches.rows,
     users: users.rows,
-    assistants: assistants.rows,
-    assistantDefinitions: assistantDefinitions.rows,
+    assistants: assistants.rows.map(mapAssistantDefinition),
+    assistantDefinitions: assistantDefinitions.rows.map(mapAssistantDefinition),
   };
 }
 

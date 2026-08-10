@@ -137,6 +137,7 @@ jobs:
         run: |
           repository_name="${GITHUB_REPOSITORY##*/}"
           image_repository="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${repository_name,,}"
+          sed -i "s|^  aida\.iqxgroup\.io/image-repository: .*|  aida.iqxgroup.io/image-repository: $image_repository|" deploy/olares/aidacrm/Chart.yaml
           sed -i "s|^  repository: .*|  repository: $image_repository|" deploy/olares/aidacrm/values.yaml
           sed -i "s|^  website: .*|  website: https://github.com/$GITHUB_REPOSITORY|" deploy/olares/aidacrm/OlaresManifest.yaml
           sed -i "s|^  sourceCode: .*|  sourceCode: https://github.com/$GITHUB_REPOSITORY|" deploy/olares/aidacrm/OlaresManifest.yaml

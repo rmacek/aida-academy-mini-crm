@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS assistant_definitions (
   creates_artifact boolean NOT NULL DEFAULT true,
   uses_product_knowledge boolean NOT NULL DEFAULT true,
   model_profile_name varchar(180),
+  cloud_processing_confirmed boolean NOT NULL DEFAULT false,
   active boolean NOT NULL DEFAULT true,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -172,6 +173,9 @@ WHERE action_instructions LIKE E'%\\nAim\\n%'
 `;
 
 export const migrationFour = `
+ALTER TABLE assistant_definitions
+  ADD COLUMN IF NOT EXISTS cloud_processing_confirmed BOOLEAN NOT NULL DEFAULT false;
+
 UPDATE assistant_definitions
 SET uses_product_knowledge = CASE assistant_key
       WHEN 'offer-author' THEN true

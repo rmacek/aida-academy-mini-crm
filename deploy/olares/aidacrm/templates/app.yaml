@@ -1,3 +1,4 @@
+{{- $imageRepository := required "aida.iqxgroup.io/image-repository annotation is required" (index .Chart.Annotations "aida.iqxgroup.io/image-repository") -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -36,7 +37,7 @@ spec:
         {{- include "aidacrm.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "aidacrm.fullname" . }}
-      automountServiceAccountToken: true
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -47,7 +48,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+          image: "{{ $imageRepository }}:{{ .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
